@@ -56,14 +56,14 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <stdexcept>
 #include "ducc-par/infra/useful_macros.h"
 
-namespace ducc::par {
+namespace ducc_par {
 
 namespace detail_error_handling {
 
 #if defined (__GNUC__)
-#define DUCC_PAR_ERROR_HANDLING_LOC_ ::ducc::par::detail_error_handling::CodeLocation(__FILE__, __LINE__, __PRETTY_FUNCTION__)
+#define DUCC_PAR_ERROR_HANDLING_LOC_ ::ducc_par::detail_error_handling::CodeLocation(__FILE__, __LINE__, __PRETTY_FUNCTION__)
 #else
-#define DUCC_PAR_ERROR_HANDLING_LOC_ ::ducc::par::detail_error_handling::CodeLocation(__FILE__, __LINE__)
+#define DUCC_PAR_ERROR_HANDLING_LOC_ ::ducc_par::detail_error_handling::CodeLocation(__FILE__, __LINE__)
 #endif
 
 // to be replaced with std::source_location once generally available
@@ -96,7 +96,7 @@ template<typename ...Args>
 [[noreturn]] DUCC_PAR_NOINLINE void fail__(Args&&... args)
   {
   ::std::ostringstream msg; \
-  ::ducc::par::detail_error_handling::streamDump__(msg, std::forward<Args>(args)...); \
+  ::ducc_par::detail_error_handling::streamDump__(msg, std::forward<Args>(args)...); \
     throw ::std::runtime_error(msg.str()); \
   }
 
@@ -104,7 +104,7 @@ template<typename ...Args>
 /// passed arguments.
 #define PAR_MR_fail(...) \
   do { \
-    ::ducc::par::detail_error_handling::fail__(DUCC_PAR_ERROR_HANDLING_LOC_, "\n", ##__VA_ARGS__, "\n"); \
+    ::ducc_par::detail_error_handling::fail__(DUCC_PAR_ERROR_HANDLING_LOC_, "\n", ##__VA_ARGS__, "\n"); \
     } while(0)
 
 /// If \a cond is false, throws a std::runtime_error containing the code

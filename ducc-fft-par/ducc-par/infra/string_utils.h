@@ -61,7 +61,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <cstdint>
 #include <cstddef>
 
-namespace ducc::par {
+namespace ducc_par {
 
 namespace detail_string_utils {
 

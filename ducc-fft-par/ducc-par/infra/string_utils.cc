@@ -69,7 +69,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include "ducc-par/infra/string_utils.h"
 #include "ducc-par/infra/error_handling.h"
 
-namespace ducc::par {
+namespace ducc_par {
 
 namespace detail_string_utils {
 

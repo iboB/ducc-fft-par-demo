@@ -57,7 +57,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <cstddef>
 #include <new>
 
-namespace ducc::par {
+namespace ducc_par {
 
 namespace detail_aligned_array {
 

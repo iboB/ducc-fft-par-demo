@@ -58,7 +58,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 // for some reason, MacOS doesn't seem to have stdx::simd_abi::deduce_t (yet?),
 // so we don't use the standard library SIMD support on MacOS.
 // In fact, we only trust libstdc++ at the moment to implement this fully.
-#if (!defined (DUCC_PAR_NO_SIMD)) && __has_include(<experimental/simd>) && defined(__GLIBCXX__) && defined(__GNUC__) && (__GNUC__>=12)
+#if (!defined (DUCC_PAR_NO_SIMD)) && __has_include(<experimental/simd>) && defined(__GLIBCXX__)
 #include <cstdint>
 #include <cstdlib>
 #include <cmath>
@@ -66,7 +66,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <type_traits>
 #include <experimental/simd>
 
-namespace ducc::par {
+namespace ducc_par {
 
 namespace detail_simd {
 
@@ -176,7 +176,7 @@ using detail_simd::blend;
 
 #endif
 
-namespace ducc::par {
+namespace ducc_par {
 
 namespace detail_simd {
 

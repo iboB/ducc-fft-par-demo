@@ -57,7 +57,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <unistd.h>
 #endif
 
-namespace ducc::par {
+namespace ducc_par {
 
 namespace detail_misc_utils {
 

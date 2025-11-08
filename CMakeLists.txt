@@ -122,6 +122,7 @@ enable_testing()
 # packages
 CPMAddPackage(gh:iboB/splat@1.3.5)
 CPMAddPackage(gh:iboB/picobench@2.08)
+CPMAddPackage(gh:iboB/par@0.1.0)
 
 CPMAddPackage(NAME ducc0
     GITHUB_REPOSITORY mreineck/ducc

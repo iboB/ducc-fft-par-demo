@@ -36,11 +36,11 @@ template<typename T> void uc2c(
 }
 
 template<typename T> void uc2c(
-    const ducc::par::cfmav<std::complex<T>>& in,
-    const ducc::par::vfmav<std::complex<T>>& out,
+    const ducc_par::cfmav<std::complex<T>>& in,
+    const ducc_par::vfmav<std::complex<T>>& out,
     const std::vector<size_t>& axes
 ) {
-    ducc::par::c2c(in, out, axes, true, 1.f, NUM_THREADS);
+    ducc_par::c2c(in, out, axes, true, 1.f, NUM_THREADS);
 }
 
 template <template <typename> class VFMAV>
@@ -63,11 +63,12 @@ void bench(picobench::state& s) {
 }
 
 PICOBENCH(bench<ducc0::vfmav>).label("original");
-PICOBENCH(bench<ducc::par::vfmav>).label("par");
+PICOBENCH(bench<ducc_par::vfmav>).label("par");
 
 int main(int argc, char* argv[]) {
     picobench::runner r;
-    r.set_default_state_iterations({10'000, 50'000});
+    r.set_default_samples(10);
+    r.set_default_state_iterations({10'000, 100'000, 1'000'000});
     r.set_compare_results_across_samples(true);
     r.set_compare_results_across_benchmarks(true);
     r.parse_cmd_line(argc, argv);

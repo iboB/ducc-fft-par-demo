@@ -54,7 +54,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <type_traits>
 #include <vector>
 
-namespace ducc::par {
+namespace ducc_par {
 
 namespace detail_unity_roots {
 

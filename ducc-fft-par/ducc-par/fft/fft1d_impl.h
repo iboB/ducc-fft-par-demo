@@ -73,17 +73,14 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include "ducc-par/infra/error_handling.h"
 #include "ducc-par/infra/aligned_array.h"
 #include "ducc-par/infra/simd.h"
-#include "ducc-par/infra/threading.h"
 #include "ducc-par/math/unity_roots.h"
 #include "ducc-par/fft/fft.h"
 
-namespace ducc::par {
+namespace ducc_par {
 
 namespace detail_fft {
 
 using namespace std;
-
-namespace {
 
 template<typename T> constexpr inline size_t fft1d_simdlen
   = min<size_t>(8, native_simd<T>::size());
@@ -99,7 +96,7 @@ template<bool fwd, typename T> void ROTX90(Cmplx<T> &a)
 
 #define POCKETFFT_EXEC_DISPATCH \
     virtual void *exec(const type_index &ti, void *in, void *copy, void *buf, \
-      bool fwd, size_t nthreads=1) const \
+      bool fwd, uint32_t nthreads=1) const \
       { \
       static const auto tics = tidx<Tcs *>(); \
       if (ti==tics) \
@@ -182,7 +179,7 @@ template <typename Tfs> class cfftp1: public cfftpass<Tfs>
     virtual size_t footprint() const { return 0; }
 
     virtual void *exec(const type_index & /*ti*/, void * in, void * /*copy*/,
-      void * /*buf*/, bool /*fwd*/, size_t /*nthreads*/) const
+      void * /*buf*/, bool /*fwd*/, uint32_t /*nthreads*/) const
       { return in; }
   };
 
@@ -199,7 +196,7 @@ template <typename Tfs> class cfftp2: public cfftpass<Tfs>
       { return wa[i-1]; }
 
     template<bool fwd, typename Tcd> Tcd *exec_ (const Tcd * DUCC_PAR_RESTRICT cc,
-      Tcd * DUCC_PAR_RESTRICT ch, Tcd * /*buf*/, size_t /*nthreads*/) const
+      Tcd * DUCC_PAR_RESTRICT ch, Tcd * /*buf*/, uint32_t /*nthreads*/) const
       {
       if (ido==1)
         {
@@ -266,7 +263,7 @@ template <typename Tfs> class cfftp3: public cfftpass<Tfs>
 
     template<bool fwd, typename Tcd> Tcd *exec_
       (const Tcd * DUCC_PAR_RESTRICT cc, Tcd * DUCC_PAR_RESTRICT ch, Tcd * /*buf*/,
-      size_t /*nthreads*/) const
+      uint32_t /*nthreads*/) const
       {
       constexpr Tfs tw1r=-0.5,
                     tw1i= (fwd ? -1: 1) * Tfs(0.8660254037844386467637231707529362L);
@@ -354,7 +351,7 @@ template <typename Tfs> class cfftp4: public cfftpass<Tfs>
 
     template<bool fwd, typename Tcd> Tcd *exec_
       (const Tcd * DUCC_PAR_RESTRICT cc, Tcd * DUCC_PAR_RESTRICT ch, Tcd * /*buf*/,
-      size_t /*nthreads*/) const
+      uint32_t /*nthreads*/) const
       {
       if (ido==1)
         {
@@ -438,7 +435,7 @@ template <typename Tfs> class cfftp5: public cfftpass<Tfs>
 
     template<bool fwd, typename Tcd> Tcd *exec_
       (const Tcd * DUCC_PAR_RESTRICT cc, Tcd * DUCC_PAR_RESTRICT ch, Tcd * /*buf*/,
-      size_t /*nthreads*/) const
+      uint32_t /*nthreads*/) const
       {
       constexpr Tfs tw1r= Tfs(0.3090169943749474241022934171828191L),
                     tw1i= (fwd ? -1: 1) * Tfs(0.9510565162951535721164393333793821L),
@@ -469,7 +466,7 @@ template <typename Tfs> class cfftp5: public cfftpass<Tfs>
 
 #define POCKETFFT_PARTSTEP5b(u1,u2,twar,twbr,twai,twbi) \
         { \
-        Tcd ca,cb; \
+        Tcd ca,cb,da,db; \
         ca.r=t0.r+twar*t1.r+twbr*t2.r; \
         ca.i=t0.i+twar*t1.i+twbr*t2.i; \
         cb.i=twai*t4.r twbi*t3.r; \
@@ -541,7 +538,7 @@ template <typename Tfs> class cfftp7: public cfftpass<Tfs>
 
     template<bool fwd, typename Tcd> Tcd *exec_
       (const Tcd * DUCC_PAR_RESTRICT cc, Tcd * DUCC_PAR_RESTRICT ch, Tcd * /*buf*/,
-      size_t /*nthreads*/) const
+      uint32_t /*nthreads*/) const
       {
       constexpr Tfs tw1r= Tfs(0.6234898018587335305250048840042398L),
                     tw1i= (fwd ? -1 : 1) * Tfs(0.7818314824680298087084445266740578L),
@@ -665,7 +662,7 @@ template <typename Tfs> class cfftp8: public cfftpass<Tfs>
       }
 
     template<bool fwd, typename Tcd> Tcd *exec_
-      (Tcd * DUCC_PAR_RESTRICT cc, Tcd * DUCC_PAR_RESTRICT ch, Tcd * /*buf*/, size_t /*nthreads*/) const
+      (Tcd * DUCC_PAR_RESTRICT cc, Tcd * DUCC_PAR_RESTRICT ch, Tcd * /*buf*/, uint32_t /*nthreads*/) const
       {
       if (l1==1)
         {
@@ -837,7 +834,7 @@ template <typename Tfs> class cfftp11: public cfftpass<Tfs>
 
     template<bool fwd, typename Tcd> [[gnu::hot]] Tcd *exec_
       (const Tcd * DUCC_PAR_RESTRICT cc, Tcd * DUCC_PAR_RESTRICT ch, Tcd * /*buf*/,
-      size_t /*nthreads*/) const
+      uint32_t /*nthreads*/) const
       {
       constexpr Tfs tw1r= Tfs(0.8412535328311811688618116489193677L),
                     tw1i= (fwd ? -1 : 1) * Tfs(0.5406408174555975821076359543186917L),
@@ -955,7 +952,7 @@ template <typename Tfs> class cfftpg: public cfftpass<Tfs>
       { return wa[i-1+x*(ido-1)]; }
 
     template<bool fwd, typename Tcd> Tcd *exec_
-      (Tcd * DUCC_PAR_RESTRICT cc, Tcd * DUCC_PAR_RESTRICT ch, Tcd * /*buf*/, size_t /*nthreads*/) const
+      (Tcd * DUCC_PAR_RESTRICT cc, Tcd * DUCC_PAR_RESTRICT ch, Tcd * /*buf*/, uint32_t /*nthreads*/) const
       {
       size_t ipph = (ip+1)/2;
       size_t idl1 = ido*l1;
@@ -1100,7 +1097,7 @@ template <typename Tfs> class cfftpblue: public cfftpass<Tfs>
 
     template<bool fwd, typename Tcd> Tcd *exec_
       (Tcd * DUCC_PAR_RESTRICT cc, Tcd * DUCC_PAR_RESTRICT ch,
-       Tcd * DUCC_PAR_RESTRICT buf, size_t nthreads) const
+       Tcd * DUCC_PAR_RESTRICT buf, uint32_t nthreads) const
       {
       static const auto ti=tidx<Tcd *>();
       Tcd *akf = &buf[0];
@@ -1240,7 +1237,7 @@ template <typename Tfs> class cfft_multipass: public cfftpass<Tfs>
 
 // FIXME split into sub-functions. This is too long!
     template<bool fwd, typename T> Cmplx<T> *exec_(Cmplx<T> *cc, Cmplx<T> *ch,
-      Cmplx<T> *buf, size_t nthreads) const
+      Cmplx<T> *buf, uint32_t nthreads) const
       {
       using Tc = Cmplx<T>;
       if ((l1==1) && (ido==1)) // no chance at vectorizing
@@ -1267,6 +1264,8 @@ template <typename Tfs> class cfft_multipass: public cfftpass<Tfs>
           // static const type_index ticv = tidx<Tcv *>();
           const type_index ticv = tidx<Tcv *>();
 
+          par::run_opts run_opts = {.sched = par::schedule_static, .max_par = nthreads};
+
           if (ido==1)
             {
             auto CH = [ch,this](size_t b, size_t c) -> Tc&
@@ -1274,15 +1273,14 @@ template <typename Tfs> class cfft_multipass: public cfftpass<Tfs>
             auto CC = [cc,this](size_t b, size_t c) -> Tc&
               { return cc[b+ip*c]; };
 
-            execStatic(nvtrans, nthreads, 0, [&](auto &sched)
+            par::pchunk(run_opts, nvtrans, [&](size_t rng_lo, size_t rng_hi)
               {
               aligned_array<Tcv> tbuf(2*ip+32+bufsize());
               auto cc2 = &tbuf[0];
               auto ch2 = &tbuf[ip+16];
               auto buf2 = &tbuf[2*ip+32];
 
-              while (auto rng=sched.getNext())
-                for(auto itrans=rng.lo; itrans<rng.hi; ++itrans)
+                for(auto itrans=rng_lo; itrans<rng_hi; ++itrans)
                   {
                   for (size_t n=0; n<vlen; ++n)
                     for (size_t m=0; m<ip; ++m)
@@ -1316,15 +1314,14 @@ template <typename Tfs> class cfft_multipass: public cfftpass<Tfs>
             auto CC = [cc,this](size_t a, size_t b) -> Tc&
               { return cc[a+ido*b]; };
 
-            execStatic(nvtrans, nthreads, 0, [&](auto &sched)
+            par::pchunk(run_opts, nvtrans, [&](size_t rng_lo, size_t rng_hi)
               {
               aligned_array<Tcv> tbuf(2*ip+32+bufsize());
               auto cc2 = &tbuf[0];
               auto ch2 = &tbuf[ip+16];
               auto buf2 = &tbuf[2*ip+32];
 
-              while (auto rng=sched.getNext())
-                for(auto itrans=rng.lo; itrans<rng.hi; ++itrans)
+                for(auto itrans=rng_lo; itrans<rng_hi; ++itrans)
                   {
                   for (size_t m=0; m<ip; ++m)
                     for (size_t n=0; n<vlen; ++n)
@@ -1672,7 +1669,7 @@ template <size_t vlen, typename Tfs> class cfftp_vecpass: public cfftpass<Tfs>
     size_t bufsz;
 
     template<bool fwd> Tcs *exec_ (Tcs *cc,
-      Tcs * /*ch*/, Tcs *sbuf, size_t nthreads) const
+      Tcs * /*ch*/, Tcs *sbuf, uint32_t nthreads) const
       {
       char *xbuf = reinterpret_cast<char *>(sbuf);
       size_t misalign = reinterpret_cast<size_t>(xbuf)&(sizeof(Tfv)-1);
@@ -1729,7 +1726,7 @@ template <size_t vlen, typename Tfs> class cfftp_vecpass: public cfftpass<Tfs>
     virtual size_t footprint() const
       { return spass->footprint()+vpass->footprint(); }
     virtual void *exec(const type_index &ti, void *in, void *copy, void *buf,
-      bool fwd, size_t nthreads=1) const
+      bool fwd, uint32_t nthreads=1) const
       {
       static const auto tics = tidx<Tcs *>();
       PAR_MR_assert(ti==tics, "bad input type");
@@ -1740,8 +1737,6 @@ template <size_t vlen, typename Tfs> class cfftp_vecpass: public cfftpass<Tfs>
                  : exec_<false>(in1, copy1, buf1, nthreads);
       }
   };
-
-} // unnamed namespace
 
 template<typename Tfs> Tcpass<Tfs> cfftpass<Tfs>::make_pass(size_t l1,
   size_t ido, size_t ip, const Troots<Tfs> &roots, bool vectorize)
@@ -1789,11 +1784,9 @@ template<typename Tfs> Tcpass<Tfs> cfftpass<Tfs>::make_pass(size_t l1,
     return make_shared<cfft_multipass<Tfs>>(l1, ido, ip, roots, vectorize);
   }
 
-namespace {
-
 #define POCKETFFT_EXEC_DISPATCH \
     virtual void *exec(const type_index &ti, void *in, void *copy, void *buf, \
-      bool fwd, size_t nthreads) const \
+      bool fwd, uint32_t nthreads) const \
       { \
       static const auto tifs=tidx<Tfs *>(); \
       if (ti==tifs) \
@@ -1877,7 +1870,7 @@ template <typename Tfs> class rfftp1: public rfftpass<Tfs>
     virtual size_t footprint() const { return 0; }
 
     virtual void *exec(const type_index & /*ti*/, void * in, void * /*copy*/,
-      void * /*buf*/, bool /*fwd*/, size_t /*nthreads*/) const
+      void * /*buf*/, bool /*fwd*/, uint32_t /*nthreads*/) const
       { return in; }
   };
 
@@ -1892,7 +1885,7 @@ template <typename Tfs> class rfftp2: public rfftpass<Tfs>
       { return wa[i+x*(ido-1)]; }
 
     template<bool fwd, typename Tfd> Tfd *exec_ (Tfd * DUCC_PAR_RESTRICT cc,
-      Tfd * DUCC_PAR_RESTRICT ch, Tfd * /*buf*/, size_t /*nthreads*/) const
+      Tfd * DUCC_PAR_RESTRICT ch, Tfd * /*buf*/, uint32_t /*nthreads*/) const
       {
       if constexpr(fwd)
         {
@@ -1988,7 +1981,7 @@ template <typename Tfs> class rfftp3: public rfftpass<Tfs>
       { return wa[i+x*(ido-1)]; }
 
     template<bool fwd, typename Tfd> Tfd *exec_ (Tfd * DUCC_PAR_RESTRICT cc,
-      Tfd * DUCC_PAR_RESTRICT ch, Tfd * /*buf*/, size_t /*nthreads*/) const
+      Tfd * DUCC_PAR_RESTRICT ch, Tfd * /*buf*/, uint32_t /*nthreads*/) const
       {
       constexpr Tfs taur=Tfs(-0.5),
                     taui=Tfs(0.8660254037844386467637231707529362L);
@@ -2096,7 +2089,7 @@ template <typename Tfs> class rfftp4: public rfftpass<Tfs>
       { return wa[i+x*(ido-1)]; }
 
     template<bool fwd, typename Tfd> Tfd *exec_ (Tfd * DUCC_PAR_RESTRICT cc,
-      Tfd * DUCC_PAR_RESTRICT ch, Tfd * /*buf*/, size_t /*nthreads*/) const
+      Tfd * DUCC_PAR_RESTRICT ch, Tfd * /*buf*/, uint32_t /*nthreads*/) const
       {
       if constexpr(fwd)
         {
@@ -2224,7 +2217,7 @@ template <typename Tfs> class rfftp5: public rfftpass<Tfs>
       { return wa[i+x*(ido-1)]; }
 
     template<bool fwd, typename Tfd> Tfd *exec_ (Tfd * DUCC_PAR_RESTRICT cc,
-      Tfd * DUCC_PAR_RESTRICT ch, Tfd * /*buf*/, size_t /*nthreads*/) const
+      Tfd * DUCC_PAR_RESTRICT ch, Tfd * /*buf*/, uint32_t /*nthreads*/) const
       {
       constexpr Tfs tr11= Tfs(0.3090169943749474241022934171828191L),
                     ti11= Tfs(0.9510565162951535721164393333793821L),
@@ -2361,7 +2354,7 @@ template <typename Tfs> class rfftpg: public rfftpass<Tfs>
     aligned_array<Tfs> wa, csarr;
 
     template<bool fwd, typename Tfd> Tfd *exec_ (Tfd * DUCC_PAR_RESTRICT cc,
-      Tfd * DUCC_PAR_RESTRICT ch, Tfd * /*buf*/, size_t /*nthreads*/) const
+      Tfd * DUCC_PAR_RESTRICT ch, Tfd * /*buf*/, uint32_t /*nthreads*/) const
       {
       if constexpr(fwd)
         {
@@ -2685,7 +2678,7 @@ template <typename Tfs> class rfftpblue: public rfftpass<Tfs>
 
     template<bool fwd, typename Tfd> Tfd *exec_
       (Tfd * DUCC_PAR_RESTRICT cc, Tfd * DUCC_PAR_RESTRICT ch,
-       Tfd * DUCC_PAR_RESTRICT buf_, size_t nthreads) const
+       Tfd * DUCC_PAR_RESTRICT buf_, uint32_t nthreads) const
       {
       using Tcd = Cmplx<Tfd>;
       auto buf = reinterpret_cast<Tcd *>(buf_);
@@ -2827,7 +2820,7 @@ template <typename Tfs> class rfft_multipass: public rfftpass<Tfs>
       { return wa[(i-1)*(ip-1)+x]; }
 
     template<bool fwd, typename Tfd> Tfd *exec_(Tfd *cc, Tfd *ch, Tfd *buf,
-      size_t nthreads) const
+      uint32_t nthreads) const
       {
       static const auto tifd = tidx<Tfd *>();
       if ((l1==1) && (ido==1))
@@ -2913,7 +2906,7 @@ template <typename Tfs> class rfftp_complexify: public rfftpass<Tfs>
     static constexpr size_t ip=2;
 
     template<bool fwd, typename Tfd> Tfd *exec_ (Tfd * DUCC_PAR_RESTRICT cc,
-      Tfd * DUCC_PAR_RESTRICT ch, Tfd * buf, size_t nthreads) const
+      Tfd * DUCC_PAR_RESTRICT ch, Tfd * buf, uint32_t nthreads) const
       {
       using Tcd = Cmplx<Tfd>;
       auto ccc = reinterpret_cast<Tcd *>(cc);
@@ -2976,8 +2969,6 @@ template <typename Tfs> class rfftp_complexify: public rfftpass<Tfs>
     POCKETFFT_EXEC_DISPATCH
   };
 #undef POCKETFFT_EXEC_DISPATCH
-
-} // unnamed namespace
 
 template<typename Tfs> Trpass<Tfs> rfftpass<Tfs>::make_pass(size_t l1,
   size_t ido, size_t ip, const Troots<Tfs> &roots, bool vectorize)

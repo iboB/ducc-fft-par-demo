@@ -55,7 +55,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <algorithm>
 #include "ducc-par/infra/mav.h"
 
-namespace ducc::par {
+namespace ducc_par {
 
 namespace detail_mav {
 

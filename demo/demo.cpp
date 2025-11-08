@@ -14,10 +14,10 @@ std::vector<std::complex<float>> original_c2c(std::vector<std::complex<float>>& 
 
 std::vector<std::complex<float>> par_c2c(std::vector<std::complex<float>>& in) {
     std::vector<std::complex<float>> out(in.size());
-    ducc::par::vfmav<std::complex<float>> vin(in.data(), {in.size()});
-    ducc::par::vfmav<std::complex<float>> vout(out.data(), {out.size()});
+    ducc_par::vfmav<std::complex<float>> vin(in.data(), {in.size()});
+    ducc_par::vfmav<std::complex<float>> vout(out.data(), {out.size()});
     std::vector<size_t> axes = {0};
-    ducc::par::c2c(vin, vout, axes, true, 1.f, 4);
+    ducc_par::c2c(vin, vout, axes, true, 1.f, 4);
     return out;
 }
 

@@ -66,7 +66,6 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <algorithm>
 #include "ducc-par/infra/useful_macros.h"
 #include "ducc-par/infra/error_handling.h"
-#include "ducc-par/infra/threading.h"
 #include "ducc-par/infra/misc_utils.h"
 #include "ducc-par/infra/simd.h"
 #include "ducc-par/infra/mav.h"
@@ -74,6 +73,9 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include "ducc-par/math/cmplx.h"
 #include "ducc-par/math/unity_roots.h"
 #include "ducc-par/fft/fft1d_impl.h"
+#include <par/prun.hpp>
+#include <par/pchunk.hpp>
+#include <mutex>
 
 /** \file fftnd_impl.h
  *  Implementation of multi-dimensional Fast Fourier and related transforms
@@ -87,13 +89,11 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  * \authors Martin Reinecke, Peter Bell
  */
 
-namespace ducc::par {
+namespace ducc_par {
 
 namespace detail_fft {
 
 using namespace std;
-
-namespace {
 
 template<typename T> constexpr inline size_t fft_simdlen
   = min<size_t>(8, native_simd<T>::size());
@@ -164,15 +164,15 @@ struct util // hack to avoid duplicate symbols
     sanity_check_cr(ac, ar, inplace, axes.back());
     }
 
-  static size_t thread_count (size_t nthreads, const fmav_info &info,
+  static uint32_t thread_count (uint32_t nthreads, const fmav_info &info,
     size_t axis, size_t /*vlen*/)
     {
     if (nthreads==1) return 1;
     size_t size = info.size();
     if (size<32768) return 1;  // not worth opening a parallel region
     size_t max_parallel = size / info.shape(axis);
-    size_t max_threads = ducc::par::adjust_nthreads(nthreads);
-    return std::max(size_t(1), std::min(max_parallel, max_threads));
+    size_t max_threads = par::thread_pool::global().get_par({.max_par = nthreads});
+    return std::max(1u, uint32_t(std::min(max_parallel, max_threads)));
     }
   };
 
@@ -190,7 +190,7 @@ template<typename T> shared_ptr<T> get_plan(size_t length, bool vectorize=false)
   static array<entry, nmax> cache{{{0,0,nullptr}}};
   static array<size_t, nmax> last_access{{0}};
   static size_t access_counter = 0;
-  static Mutex mut;
+  static std::mutex mut;
 
   auto find_in_cache = [&]() -> shared_ptr<T>
     {
@@ -212,7 +212,7 @@ template<typename T> shared_ptr<T> get_plan(size_t length, bool vectorize=false)
     };
 
   {
-  LockGuard lock(mut);
+  std::lock_guard lock(mut);
 
   auto p = find_in_cache();
   if (p) return p;
@@ -222,7 +222,7 @@ template<typename T> shared_ptr<T> get_plan(size_t length, bool vectorize=false)
   if (plan->footprint() > size_limit)  // too large for caching
     return plan;
   {
-  LockGuard lock(mut);
+  std::lock_guard lock(mut);
 
   auto p = find_in_cache();
   if (p) return p;
@@ -610,7 +610,7 @@ template <typename T, size_t vlen> using add_vec_t = typename add_vec<T, vlen>::
 
 template<typename Tplan, typename T, typename T0, typename Exec>
 DUCC_PAR_NOINLINE void general_nd(const cfmav<T> &in, const vfmav<T> &out,
-  const shape_t &axes, T0 fct, size_t nthreads, const Exec &exec,
+  const shape_t &axes, T0 fct, uint32_t nthreads, const Exec &exec,
   const bool /*allow_inplace*/=true)
   {
   if ((in.ndim()==1)&&(in.stride(0)==1)&&(out.stride(0)==1))
@@ -620,7 +620,7 @@ DUCC_PAR_NOINLINE void general_nd(const cfmav<T> &in, const vfmav<T> &out,
     return;
     }
   shared_ptr<Tplan> plan, vplan;
-  size_t nth1d = (in.ndim()==1) ? nthreads : 1;
+  uint32_t nth1d = (in.ndim()==1) ? nthreads : 1;
 
   for (size_t iax=0; iax<axes.size(); ++iax)
     {
@@ -632,13 +632,15 @@ DUCC_PAR_NOINLINE void general_nd(const cfmav<T> &in, const vfmav<T> &out,
         plan : get_plan<Tplan>(len, true);
       }
 
-    execParallel(util::thread_count(nthreads, in, axes[iax], fft_simdlen<T0>),
-      [&](Scheduler &sched)
+    par::prun(
+      {.max_par = util::thread_count(nthreads, in, axes[iax], fft_simdlen<T0>)},
+      [&](const par::job_info& job_info)
       {
+      const auto [job_index, num_jobs] = job_info;
       constexpr auto vlen = fft_simdlen<T0>;
       constexpr size_t nmax = 16;
       const auto &tin(iax==0? in : out);
-      multi_iter<nmax> it(tin, out, axes[iax], sched.num_threads(), sched.thread_num());
+      multi_iter<nmax> it(tin, out, axes[iax], num_jobs, job_index);
 
       // n_simul: vector size
       // n_bunch: total size of bunch (multiple of n_simul)
@@ -811,7 +813,7 @@ struct ExecC2C
   template <typename T0, typename Tstorage, typename Titer> DUCC_PAR_NOINLINE void operator() (
     const Titer &it, const cfmav<Cmplx<T0>> &in,
     const vfmav<Cmplx<T0>> &out, Tstorage &storage, const pocketfft_c<T0> &plan, T0 fct,
-    size_t nthreads, bool inplace=false) const
+    uint32_t nthreads, bool inplace=false) const
     {
     using T = typename Tstorage::datatype;
     if constexpr(is_same<Cmplx<T0>, T>::value)
@@ -830,7 +832,7 @@ struct ExecC2C
   template <typename T0, typename Tstorage, typename Titer> DUCC_PAR_NOINLINE void exec_n (
     const Titer &it, const cfmav<Cmplx<T0>> &in,
     const vfmav<Cmplx<T0>> &out, Tstorage &storage, const pocketfft_c<T0> &plan, T0 fct, size_t nvec,
-    size_t nthreads) const
+    uint32_t nthreads) const
     {
     using T = typename Tstorage::datatype;
     size_t dstr = storage.data_stride();
@@ -842,7 +844,7 @@ struct ExecC2C
     }
   template <typename T0> DUCC_PAR_NOINLINE void exec_simple (
     const Cmplx<T0> *in, Cmplx<T0> *out, const pocketfft_c<T0> &plan, T0 fct,
-    size_t nthreads) const
+    uint32_t nthreads) const
     {
     if (in!=out) copy_n(in, plan.length(), out);
     plan.exec(out, fct, forward, nthreads);
@@ -853,7 +855,7 @@ struct ExecHartley
   {
   template <typename T0, typename Tstorage, typename Titer> DUCC_PAR_NOINLINE void operator() (
     const Titer &it, const cfmav<T0> &in, const vfmav<T0> &out,
-    Tstorage &storage, const pocketfft_hartley<T0> &plan, T0 fct, size_t nthreads,
+    Tstorage &storage, const pocketfft_hartley<T0> &plan, T0 fct, uint32_t nthreads,
     bool inplace=false) const
     {
     using T = typename Tstorage::datatype;
@@ -873,7 +875,7 @@ struct ExecHartley
   template <typename T0, typename Tstorage, typename Titer> DUCC_PAR_NOINLINE void exec_n (
     const Titer &it, const cfmav<T0> &in,
     const vfmav<T0> &out, Tstorage &storage, const pocketfft_hartley<T0> &plan, T0 fct, size_t nvec,
-    size_t nthreads) const
+    uint32_t nthreads) const
     {
     using T = typename Tstorage::datatype;
     size_t dstr = storage.data_stride();
@@ -885,7 +887,7 @@ struct ExecHartley
     }
   template <typename T0> DUCC_PAR_NOINLINE void exec_simple (
     const T0 *in, T0 *out, const pocketfft_hartley<T0> &plan, T0 fct,
-    size_t nthreads) const
+    uint32_t nthreads) const
     {
     if (in!=out) copy_n(in, plan.length(), out);
     plan.exec(out, fct, nthreads);
@@ -896,7 +898,7 @@ struct ExecFHT
   {
   template <typename T0, typename Tstorage, typename Titer> DUCC_PAR_NOINLINE void operator() (
     const Titer &it, const cfmav<T0> &in, const vfmav<T0> &out,
-    Tstorage &storage, const pocketfft_fht<T0> &plan, T0 fct, size_t nthreads,
+    Tstorage &storage, const pocketfft_fht<T0> &plan, T0 fct, uint32_t nthreads,
     bool inplace=false) const
     {
     using T = typename Tstorage::datatype;
@@ -916,7 +918,7 @@ struct ExecFHT
   template <typename T0, typename Tstorage, typename Titer> DUCC_PAR_NOINLINE void exec_n (
     const Titer &it, const cfmav<T0> &in,
     const vfmav<T0> &out, Tstorage &storage, const pocketfft_fht<T0> &plan, T0 fct, size_t nvec,
-    size_t nthreads) const
+    uint32_t nthreads) const
     {
     using T = typename Tstorage::datatype;
     size_t dstr = storage.data_stride();
@@ -928,7 +930,7 @@ struct ExecFHT
     }
   template <typename T0> DUCC_PAR_NOINLINE void exec_simple (
     const T0 *in, T0 *out, const pocketfft_fht<T0> &plan, T0 fct,
-    size_t nthreads) const
+    uint32_t nthreads) const
     {
     if (in!=out) copy_n(in, plan.length(), out);
     plan.exec(out, fct, nthreads);
@@ -941,7 +943,7 @@ struct ExecFFTW
 
   template <typename T0, typename Tstorage, typename Titer> DUCC_PAR_NOINLINE void operator() (
     const Titer &it, const cfmav<T0> &in, const vfmav<T0> &out,
-    Tstorage &storage, const pocketfft_fftw<T0> &plan, T0 fct, size_t nthreads,
+    Tstorage &storage, const pocketfft_fftw<T0> &plan, T0 fct, uint32_t nthreads,
     bool inplace=false) const
     {
     using T = typename Tstorage::datatype;
@@ -961,7 +963,7 @@ struct ExecFFTW
   template <typename T0, typename Tstorage, typename Titer> DUCC_PAR_NOINLINE void exec_n (
     const Titer &it, const cfmav<T0> &in,
     const vfmav<T0> &out, Tstorage &storage, const pocketfft_fftw<T0> &plan, T0 fct, size_t nvec,
-    size_t nthreads) const
+    uint32_t nthreads) const
     {
     using T = typename Tstorage::datatype;
     size_t dstr = storage.data_stride();
@@ -973,7 +975,7 @@ struct ExecFFTW
     }
   template <typename T0> DUCC_PAR_NOINLINE void exec_simple (
     const T0 *in, T0 *out, const pocketfft_fftw<T0> &plan, T0 fct,
-    size_t nthreads) const
+    uint32_t nthreads) const
     {
     if (in!=out) copy_n(in, plan.length(), out);
     plan.exec(out, fct, forward, nthreads);
@@ -988,7 +990,7 @@ struct ExecDcst
 
   template <typename T0, typename Tstorage, typename Tplan, typename Titer>
   DUCC_PAR_NOINLINE void operator() (const Titer &it, const cfmav<T0> &in,
-    const vfmav <T0> &out, Tstorage &storage, const Tplan &plan, T0 fct, size_t nthreads,
+    const vfmav <T0> &out, Tstorage &storage, const Tplan &plan, T0 fct, uint32_t nthreads,
     bool inplace=false) const
     {
     using T = typename Tstorage::datatype;
@@ -1008,7 +1010,7 @@ struct ExecDcst
   template <typename T0, typename Tstorage, typename Tplan, typename Titer> DUCC_PAR_NOINLINE void exec_n (
     const Titer &it, const cfmav<T0> &in,
     const vfmav<T0> &out, Tstorage &storage, const Tplan &plan, T0 fct, size_t nvec,
-    size_t nthreads) const
+    uint32_t nthreads) const
     {
     using T = typename Tstorage::datatype;
     size_t dstr = storage.data_stride();
@@ -1020,7 +1022,7 @@ struct ExecDcst
     }
   template <typename T0, typename Tplan> DUCC_PAR_NOINLINE void exec_simple (
     const T0 *in, T0 *out, const Tplan &plan, T0 fct,
-    size_t nthreads) const
+    uint32_t nthreads) const
     {
     if (in!=out) copy_n(in, plan.length(), out);
     plan.exec(out, fct, ortho, type, cosine, nthreads);
@@ -1029,17 +1031,18 @@ struct ExecDcst
 
 template<typename T> DUCC_PAR_NOINLINE void general_r2c(
   const cfmav<T> &in, const vfmav<Cmplx<T>> &out, size_t axis, bool forward, T fct,
-  size_t nthreads)
+  uint32_t nthreads)
   {
-  size_t nth1d = (in.ndim()==1) ? nthreads : 1;
+  uint32_t nth1d = (in.ndim()==1) ? nthreads : 1;
   auto plan = get_plan<pocketfft_r<T>>(in.shape(axis), in.ndim()==1);
   size_t len=in.shape(axis);
-  execParallel(
-    util::thread_count(nthreads, in, axis, fft_simdlen<T>),
-    [&](Scheduler &sched) {
+  par::prun(
+    {.max_par = util::thread_count(nthreads, in, axis, fft_simdlen<T>)},
+    [&](const par::job_info& job_info) {
+    const auto [job_index, num_jobs] = job_info;
     constexpr auto vlen = fft_simdlen<T>;
     TmpStorage<T,T> storage(in.size()/len, len, plan->bufsize(), 1, false);
-    multi_iter<vlen> it(in, out, axis, sched.num_threads(), sched.thread_num());
+    multi_iter<vlen> it(in, out, axis, num_jobs, job_index);
 #ifndef DUCC_PAR_NO_SIMD
     if constexpr (vlen>1)
       {
@@ -1147,17 +1150,18 @@ template<typename T> DUCC_PAR_NOINLINE void general_r2c(
   }
 template<typename T> DUCC_PAR_NOINLINE void general_c2r(
   const cfmav<Cmplx<T>> &in, const vfmav<T> &out, size_t axis, bool forward, T fct,
-  size_t nthreads)
+  uint32_t nthreads)
   {
-  size_t nth1d = (in.ndim()==1) ? nthreads : 1;
+  uint32_t nth1d = (in.ndim()==1) ? nthreads : 1;
   auto plan = get_plan<pocketfft_r<T>>(out.shape(axis), in.ndim()==1);
   size_t len=out.shape(axis);
-  execParallel(
-    util::thread_count(nthreads, in, axis, fft_simdlen<T>),
-    [&](Scheduler &sched) {
+  par::prun(
+    {.max_par = util::thread_count(nthreads, in, axis, fft_simdlen<T>)},
+    [&](const par::job_info& job_info) {
+      const auto [job_index, num_jobs] = job_info;
       constexpr auto vlen = fft_simdlen<T>;
       TmpStorage<T,T> storage(out.size()/len, len, plan->bufsize(), 1, false);
-      multi_iter<vlen> it(in, out, axis, sched.num_threads(), sched.thread_num());
+      multi_iter<vlen> it(in, out, axis, num_jobs, job_index);
 #ifndef DUCC_PAR_NO_SIMD
       if constexpr (vlen>1)
         {
@@ -1298,7 +1302,7 @@ struct ExecR2R
 
   template <typename T0, typename Tstorage, typename Titer> DUCC_PAR_NOINLINE void operator() (
     const Titer &it, const cfmav<T0> &in, const vfmav<T0> &out, Tstorage &storage,
-    const pocketfft_r<T0> &plan, T0 fct, size_t nthreads,
+    const pocketfft_r<T0> &plan, T0 fct, uint32_t nthreads,
     bool inplace=false) const
     {
     using T = typename Tstorage::datatype;
@@ -1332,7 +1336,7 @@ struct ExecR2R
   template <typename T0, typename Tstorage, typename Titer> DUCC_PAR_NOINLINE void exec_n (
     const Titer &it, const cfmav<T0> &in,
     const vfmav<T0> &out, Tstorage &storage, const pocketfft_r<T0> &plan, T0 fct, size_t nvec,
-    size_t nthreads) const
+    uint32_t nthreads) const
     {
     using T = typename Tstorage::datatype;
     size_t dstr = storage.data_stride();
@@ -1352,7 +1356,7 @@ struct ExecR2R
     }
   template <typename T0> DUCC_PAR_NOINLINE void exec_simple (
     const T0 *in, T0 *out, const pocketfft_r<T0> &plan, T0 fct,
-    size_t nthreads) const
+    uint32_t nthreads) const
     {
     if (in!=out) copy_n(in, plan.length(), out);
     if ((!r2c) && forward)
@@ -1365,8 +1369,6 @@ struct ExecR2R
     }
   };
 
-} // unnamed namespace
-
 template<typename T> class Long1dPlan: public UnityRoots<T,complex<T>>
   {
   public:
@@ -1376,7 +1378,7 @@ template<typename T> class Long1dPlan: public UnityRoots<T,complex<T>>
 
 template<typename T> DUCC_PAR_NOINLINE void c2c(const cfmav<complex<T>> &in,
   const vfmav<complex<T>> &out, const shape_t &axes, bool forward,
-  T fct, size_t nthreads)
+  T fct, uint32_t nthreads)
   {
   util::sanity_check_onetype(in, out, in.data()==out.data(), axes);
   if (in.size()==0) return;
@@ -1390,8 +1392,8 @@ template<typename T> DUCC_PAR_NOINLINE void c2c(const cfmav<complex<T>> &in,
     auto factors = util1d::prime_factors(ip);
     sort(factors.begin(), factors.end(), std::greater<size_t>());
     size_t f1=1, f2=1;
-    for (auto fct: factors)
-      (f2>f1) ? f1*=fct : f2*=fct;
+    for (auto pf: factors)
+      (f2>f1) ? f1*=pf : f2*=pf;
     if (f1>f2) swap(f1,f2);
     if (f1>=16) // 2D algorithm makes sense
       {
@@ -1406,17 +1408,16 @@ template<typename T> DUCC_PAR_NOINLINE void c2c(const cfmav<complex<T>> &in,
       c2c(fin2, ftmp, {0}, forward, T(1), nthreads);
       auto roots_p = get_plan<Long1dPlan<T>>(ip);
       const auto &roots(*roots_p);
+      par::run_opts opts = {.sched = par::schedule_static, .max_par = nthreads};
       if (forward)
-        execStatic(f1, nthreads, 0, [&](Scheduler &sched) {
-          while (auto rng=sched.getNext())
-            for (auto i=rng.lo; i<rng.hi; ++i)
+        par::pchunk(opts, f1, [&](size_t rng_lo, size_t rng_hi) {
+            for (auto i=rng_lo; i<rng_hi; ++i)
               for (size_t j=0; j<f2; ++j)
                 tmp(i,j) *= conj(roots[i*j]);
           });
       else
-        execStatic(f1, nthreads, 0, [&](Scheduler &sched) {
-          while (auto rng=sched.getNext())
-            for (auto i=rng.lo; i<rng.hi; ++i)
+        par::pchunk(opts, f1, [&](size_t rng_lo, size_t rng_hi) {
+            for (auto i=rng_lo; i<rng_hi; ++i)
               for (size_t j=0; j<f2; ++j)
                 tmp(i,j) *= roots[i*j];
           });
@@ -1449,7 +1450,7 @@ template<typename T> DUCC_PAR_NOINLINE void c2c(const cfmav<complex<T>> &in,
   }
 
 template<typename T> DUCC_PAR_NOINLINE void dct(const cfmav<T> &in, const vfmav<T> &out,
-  const shape_t &axes, int type, T fct, bool ortho, size_t nthreads)
+  const shape_t &axes, int type, T fct, bool ortho, uint32_t nthreads)
   {
   if ((type<1) || (type>4)) throw invalid_argument("invalid DCT type");
   util::sanity_check_onetype(in, out, in.data()==out.data(), axes);
@@ -1464,7 +1465,7 @@ template<typename T> DUCC_PAR_NOINLINE void dct(const cfmav<T> &in, const vfmav<
   }
 
 template<typename T> DUCC_PAR_NOINLINE void dst(const cfmav<T> &in, const vfmav<T> &out,
-  const shape_t &axes, int type, T fct, bool ortho, size_t nthreads)
+  const shape_t &axes, int type, T fct, bool ortho, uint32_t nthreads)
   {
   if ((type<1) || (type>4)) throw invalid_argument("invalid DST type");
   util::sanity_check_onetype(in, out, in.data()==out.data(), axes);
@@ -1480,7 +1481,7 @@ template<typename T> DUCC_PAR_NOINLINE void dst(const cfmav<T> &in, const vfmav<
 
 template<typename T> DUCC_PAR_NOINLINE void r2c(const cfmav<T> &in,
   const vfmav<complex<T>> &out, size_t axis, bool forward, T fct,
-  size_t nthreads)
+  uint32_t nthreads)
   {
   bool inplace = in.data() == reinterpret_cast<const T*>(out.data());
   util::sanity_check_cr(out, in, inplace, axis);
@@ -1491,7 +1492,7 @@ template<typename T> DUCC_PAR_NOINLINE void r2c(const cfmav<T> &in,
 
 template<typename T> DUCC_PAR_NOINLINE void r2c(const cfmav<T> &in,
   const vfmav<complex<T>> &out, const shape_t &axes,
-  bool forward, T fct, size_t nthreads)
+  bool forward, T fct, uint32_t nthreads)
   {
   bool inplace = in.data() == reinterpret_cast<const T*>(out.data());
   util::sanity_check_cr(out, in, inplace, axes);
@@ -1504,7 +1505,7 @@ template<typename T> DUCC_PAR_NOINLINE void r2c(const cfmav<T> &in,
   }
 
 template<typename T> DUCC_PAR_NOINLINE void c2r(const cfmav<complex<T>> &in,
-  const vfmav<T> &out,  size_t axis, bool forward, T fct, size_t nthreads)
+  const vfmav<T> &out,  size_t axis, bool forward, T fct, uint32_t nthreads)
   {
   bool inplace = reinterpret_cast<const T*>(in.data()) == out.data();
   util::sanity_check_cr(in, out, inplace, axis);
@@ -1515,7 +1516,7 @@ template<typename T> DUCC_PAR_NOINLINE void c2r(const cfmav<complex<T>> &in,
 
 template<typename T> DUCC_PAR_NOINLINE void c2r_mut(const vfmav<complex<T>> &in,
   const vfmav<T> &out, const shape_t &axes, bool forward, T fct,
-  size_t nthreads)
+  uint32_t nthreads)
   {
   if (axes.size()==1)
     return c2r(in, out, axes[0], forward, fct, nthreads);
@@ -1529,7 +1530,7 @@ template<typename T> DUCC_PAR_NOINLINE void c2r_mut(const vfmav<complex<T>> &in,
 
 template<typename T> DUCC_PAR_NOINLINE void c2r(const cfmav<complex<T>> &in,
   const vfmav<T> &out, const shape_t &axes, bool forward, T fct,
-  size_t nthreads)
+  uint32_t nthreads)
   {
   if (axes.size()==1)
     return c2r(in, out, axes[0], forward, fct, nthreads);
@@ -1549,7 +1550,7 @@ template<typename T> DUCC_PAR_NOINLINE void c2r(const cfmav<complex<T>> &in,
 
 template<typename T> DUCC_PAR_NOINLINE void r2r_fftpack(const cfmav<T> &in,
   const vfmav<T> &out, const shape_t &axes, bool real2hermitian, bool forward,
-  T fct, size_t nthreads)
+  T fct, uint32_t nthreads)
   {
   util::sanity_check_onetype(in, out, in.data()==out.data(), axes);
   if (in.size()==0) return;
@@ -1559,7 +1560,7 @@ template<typename T> DUCC_PAR_NOINLINE void r2r_fftpack(const cfmav<T> &in,
 
 template<typename T> DUCC_PAR_NOINLINE void r2r_fftw(const cfmav<T> &in,
   const vfmav<T> &out, const shape_t &axes, bool forward,
-  T fct, size_t nthreads)
+  T fct, uint32_t nthreads)
   {
   util::sanity_check_onetype(in, out, in.data()==out.data(), axes);
   if (in.size()==0) return;
@@ -1568,7 +1569,7 @@ template<typename T> DUCC_PAR_NOINLINE void r2r_fftw(const cfmav<T> &in,
   }
 
 template<typename T> DUCC_PAR_NOINLINE void r2r_separable_hartley(const cfmav<T> &in,
-  const vfmav<T> &out, const shape_t &axes, T fct, size_t nthreads)
+  const vfmav<T> &out, const shape_t &axes, T fct, uint32_t nthreads)
   {
   util::sanity_check_onetype(in, out, in.data()==out.data(), axes);
   if (in.size()==0) return;
@@ -1577,7 +1578,7 @@ template<typename T> DUCC_PAR_NOINLINE void r2r_separable_hartley(const cfmav<T>
   }
 
 template<typename T> DUCC_PAR_NOINLINE void r2r_separable_fht(const cfmav<T> &in,
-  const vfmav<T> &out, const shape_t &axes, T fct, size_t nthreads)
+  const vfmav<T> &out, const shape_t &axes, T fct, uint32_t nthreads)
   {
   util::sanity_check_onetype(in, out, in.data()==out.data(), axes);
   if (in.size()==0) return;
@@ -1585,10 +1586,8 @@ template<typename T> DUCC_PAR_NOINLINE void r2r_separable_fht(const cfmav<T> &in
     ExecFHT{}, false);
   }
 
-namespace {
-
 template<typename T> void oscarize(const vfmav<T> &data, size_t ax0, size_t ax1,
-  size_t nthreads)
+  uint32_t nthreads)
   {
   auto nu=data.shape(ax0), nv=data.shape(ax1);
   if ((nu<3)||(nv<3)) return;
@@ -1613,10 +1612,8 @@ template<typename T> void oscarize(const vfmav<T> &data, size_t ax0, size_t ax1,
     }, nthreads, all, ahl, ahh, alh);
   }
 
-} // unnamed namespace
-
 template<typename T> void r2r_genuine_hartley(const cfmav<T> &in,
-  const vfmav<T> &out, const shape_t &axes, T fct, size_t nthreads)
+  const vfmav<T> &out, const shape_t &axes, T fct, uint32_t nthreads)
   {
   if (axes.size()==1)
     return r2r_separable_hartley(in, out, axes, fct, nthreads);
@@ -1641,7 +1638,7 @@ template<typename T> void r2r_genuine_hartley(const cfmav<T> &in,
   }
 
 template<typename T> void r2r_genuine_fht(const cfmav<T> &in,
-  const vfmav<T> &out, const shape_t &axes, T fct, size_t nthreads)
+  const vfmav<T> &out, const shape_t &axes, T fct, uint32_t nthreads)
   {
   if (axes.size()==1)
     return r2r_separable_fht(in, out, axes, fct, nthreads);
@@ -1665,11 +1662,9 @@ template<typename T> void r2r_genuine_fht(const cfmav<T> &in,
     }, nthreads);
   }
 
-namespace {
-
 template<typename Tplan, typename T0, typename T, typename Exec>
 DUCC_PAR_NOINLINE void general_convolve_axis(const cfmav<T> &in, const vfmav<T> &out,
-  const size_t axis, const cmav<T,1> &kernel, size_t nthreads,
+  const size_t axis, const cmav<T,1> &kernel, uint32_t nthreads,
   const Exec &exec)
   {
   size_t l_in=in.shape(axis), l_out=out.shape(axis);
@@ -1683,12 +1678,13 @@ DUCC_PAR_NOINLINE void general_convolve_axis(const cfmav<T> &in, const vfmav<T> 
     fkernel(i) = kernel(i);
   plan1->exec(fkernel.data(), T0(1)/T0(l_in), true, nthreads);
 
-  execParallel(
-    util::thread_count(nthreads, in, axis, fft_simdlen<T0>),
-    [&](Scheduler &sched) {
+  par::prun(
+    {.max_par = util::thread_count(nthreads, in, axis, fft_simdlen<T0>)},
+    [&](const par::job_info& job_info) {
+      const auto [job_index, num_jobs] = job_info;
       constexpr auto vlen = fft_simdlen<T0>;
       TmpStorage<T,T0> storage(in.size()/l_in, l_in+l_out, bufsz, 1, false);
-      multi_iter<vlen> it(in, out, axis, sched.num_threads(), sched.thread_num());
+      multi_iter<vlen> it(in, out, axis, num_jobs, job_index);
 #ifndef DUCC_PAR_NO_SIMD
       if constexpr (vlen>1)
         {
@@ -1813,10 +1809,8 @@ struct ExecConv1C
     }
   };
 
-} // unnamed namespace
-
 template<typename T> DUCC_PAR_NOINLINE void convolve_axis(const cfmav<T> &in,
-  const vfmav<T> &out, size_t axis, const cmav<T,1> &kernel, size_t nthreads)
+  const vfmav<T> &out, size_t axis, const cmav<T,1> &kernel, uint32_t nthreads)
   {
   PAR_MR_assert(axis<in.ndim(), "bad axis number");
   PAR_MR_assert(in.ndim()==out.ndim(), "dimensionality mismatch");
@@ -1831,7 +1825,7 @@ template<typename T> DUCC_PAR_NOINLINE void convolve_axis(const cfmav<T> &in,
   }
 template<typename T> DUCC_PAR_NOINLINE void convolve_axis(const cfmav<complex<T>> &in,
   const vfmav<complex<T>> &out, size_t axis, const cmav<complex<T>,1> &kernel,
-  size_t nthreads)
+  uint32_t nthreads)
   {
   PAR_MR_assert(axis<in.ndim(), "bad axis number");
   PAR_MR_assert(in.ndim()==out.ndim(), "dimensionality mismatch");
@@ -1850,6 +1844,6 @@ template<typename T> DUCC_PAR_NOINLINE void convolve_axis(const cfmav<complex<T>
 
 } // namespace detail_fft
 
-} // namespace ducc::par
+} // namespace ducc_par
 
 #endif // POCKETFFT_HDRONLY_H

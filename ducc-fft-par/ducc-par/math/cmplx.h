@@ -53,7 +53,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #ifndef DUCC_PAR_CMPLX_H
 #define DUCC_PAR_CMPLX_H
 
-namespace ducc::par {
+namespace ducc_par {
 
 /// Very basic class representing complex numbers
 /** Meant exclusively for internal low-level use, e.g. in FFT routines. */

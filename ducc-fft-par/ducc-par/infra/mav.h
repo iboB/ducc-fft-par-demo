@@ -58,16 +58,16 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <memory>
 #include <numeric>
 #include <cstddef>
-#include <cstdint>
 #include <functional>
 #include <tuple>
+#include <mutex>
 #include "ducc-par/infra/useful_macros.h"
 #include "ducc-par/infra/error_handling.h"
 #include "ducc-par/infra/aligned_array.h"
 #include "ducc-par/infra/misc_utils.h"
-#include "ducc-par/infra/threading.h"
+#include <par/pchunk.hpp>
 
-namespace ducc::par {
+namespace ducc_par {
 
 namespace detail_mav {
 
@@ -76,26 +76,26 @@ using namespace std;
 struct uninitialized_dummy {};
 constexpr uninitialized_dummy UNINITIALIZED;
 
-static inline void page_in_memory2(char *ptr, size_t sz, size_t nthreads=1)
+static inline void page_in_memory2(char *ptr, size_t sz, uint32_t nthreads=1)
   {
   if (sz==0) return;
 // FIXME: can we determine the real page size for the underlying chunk of memory?
   size_t pagesize = 4096;
   size_t npages = (sz+pagesize-1)/pagesize;
 // FIXME: perhaps reduce nthreads if number of pages is low?
-  nthreads = min(npages, max(size_t(1), npages/1024));
-  execParallel(npages, nthreads, [&](size_t lo, size_t hi) {
+  nthreads = uint32_t(min(npages, max(size_t(1), npages/1024)));
+  par::pchunk({.max_par = nthreads}, npages, [&](size_t lo, size_t hi) {
   for (size_t i=lo; i<hi; ++i)
     ptr[i*pagesize]=char(1);  // touch the memory page with a write access
     });
   }
-template<typename T> void page_in_memory(T *ptr, size_t sz, size_t nthreads=1)
+template<typename T> void page_in_memory(T *ptr, size_t sz, uint32_t nthreads=1)
   { page_in_memory2(reinterpret_cast<char *>(ptr), sizeof(T)*sz, nthreads); }
 
 struct PAGE_IN
   {
-  size_t nthreads;
-  PAGE_IN(size_t nthreads_) : nthreads(nthreads_) {}
+  uint32_t nthreads;
+  PAGE_IN(uint32_t nthreads_) : nthreads(nthreads_) {}
   };
 
 template<typename T> class cmembuf
@@ -354,21 +354,9 @@ class fmav_info
       std::iota(axpos.begin(), axpos.end(), firstaxis);
       return extend_and_broadcast(new_shape, axpos);
       }
-    fmav_info transpose(const shape_t &axes) const
+    fmav_info transpose() const
       {
-      PAR_MR_assert(axes.size()==ndim(), "bad axes length");
-      shape_t shp2(ndim());
-      stride_t str2(ndim());
-      shape_t control(ndim(),0);
-      for (size_t i=0; i<ndim(); ++i)
-        {
-        PAR_MR_assert(axes[i]<ndim(), "invalid axis number");
-        PAR_MR_assert(control[axes[i]]==0, "repeated axis");
-        control[axes[i]] = 1;
-        shp2[i] = shp[axes[i]];
-        str2[i] = str[axes[i]];
-        }
-      return fmav_info(shp2, str2);
+      return fmav_info({shp.crend(), shp.crbegin()}, {str.crbegin(), str.crend()});
       }
   protected:
     auto subdata(const vector<slice> &slices) const
@@ -538,19 +526,14 @@ template<size_t ndim> class mav_info
       swap(shp[ax0], shp[ax1]);
       swap(str[ax0], str[ax1]);
       }
-    mav_info transpose(const shape_t &axes) const
+    mav_info transpose() const
       {
       shape_t shp2;
       stride_t str2;
-      shape_t control;
-      for (auto &c:control) c=0;
       for (size_t i=0; i<ndim; ++i)
         {
-        PAR_MR_assert(axes[i]<ndim, "invalid axis number");
-        PAR_MR_assert(control[axes[i]]==0, "repeated axis");
-        control[axes[i]] = 1;
-        shp2[i] = shp[axes[i]];
-        str2[i] = str[axes[i]];
+        shp2[i] = shp[ndim-1-i];
+        str2[i] = str[ndim-1-i];
         }
       return mav_info(shp2, str2);
       }
@@ -686,10 +669,9 @@ template<typename T> class cfmav: public fmav_info, public cmembuf<T>
       {
       return cfmav(fmav_info::extend_and_broadcast(new_shape, firstaxis), *this);
       }
-    cfmav transpose(const shape_t &axes) const
+    cfmav transpose() const
       {
-      return cfmav(static_cast<const tinfo *>(this)->transpose(axes),
-                   *static_cast<const tbuf *>(this));
+      return cfmav(static_cast<const tinfo *>(this)->transpose(), *static_cast<const tbuf *>(this));
       }
   };
 
@@ -820,10 +802,9 @@ template<typename T> class vfmav: public cfmav<T>
       {
       return vfmav(fmav_info::extend_and_broadcast(new_shape, firstaxis), *this);
       }
-    vfmav transpose(const shape_t &axes) const
+    vfmav transpose() const
       {
-      return vfmav(static_cast<const tinfo *>(this)->transpose(axes),
-                  *static_cast<const tbuf *>(this));
+      return vfmav(static_cast<const tinfo *>(this)->transpose(), *static_cast<const tbuf *>(this));
       }
   };
 
@@ -921,10 +902,9 @@ template<typename T, size_t ndim> class cmav: public mav_info<ndim>, public cmem
       nshp.fill(0);
       return cmav(static_cast<T *>(nullptr), nshp);
       }
-    cmav transpose(const shape_t &axes) const
+    cmav transpose() const
       {
-      return cmav(static_cast<const tinfo *>(this)->transpose(axes),
-                 *static_cast<const tbuf *>(this));
+      return cmav(static_cast<const tinfo *>(this)->transpose(), *static_cast<const tbuf *>(this));
       }
     cmav<T, ndim+1> prepend_1() const
       {
@@ -1045,10 +1025,9 @@ template<typename T, size_t ndim> class vmav: public cmav<T, ndim>
       for (size_t i=0; i<ndim; ++i) slc[i] = slice(0, shape[i]);
       return tmp.subarray<ndim>(slc);
       }
-    vmav transpose(const shape_t &axes) const
+    vmav transpose() const
       {
-      return vmav(static_cast<const tinfo *>(this)->transpose(axes),
-                 *static_cast<const tbuf *>(this));
+      return vmav(static_cast<const tinfo *>(this)->transpose(), *static_cast<const tbuf *>(this));
       }
     vmav<T, ndim+1> prepend_1() const
       {
@@ -1231,14 +1210,14 @@ template<typename Ttuple, typename Func>
 template<typename Func, typename Ttuple>
   inline void applyHelper(const vector<size_t> &shp,
     const vector<vector<ptrdiff_t>> &str, size_t block0, size_t block1,
-    const Ttuple &ptrs, Func &&func, size_t nthreads, bool last_contiguous)
+    const Ttuple &ptrs, Func &&func, uint32_t nthreads, bool last_contiguous)
   {
   if (shp.size()==0)
     call_with_tuple(std::forward<Func>(func), to_ref(ptrs));
   else if (nthreads==1)
     applyHelper(0, shp, str, block0, block1, ptrs, std::forward<Func>(func), last_contiguous);
   else
-    execParallel(shp[0], nthreads, [&](size_t lo, size_t hi)
+    par::pchunk({.max_par = nthreads}, shp[0], [&](size_t lo, size_t hi)
       {
       auto locptrs = update_pointers(ptrs, str, 0, lo);
       auto locshp(shp);
@@ -1328,7 +1307,7 @@ template<typename ReduceType, typename Ttuple, typename Func>
 template<typename ReduceType, typename Func, typename Ttuple>
   inline ReduceType applyReduceHelper(const vector<size_t> &shp,
     const vector<vector<ptrdiff_t>> &str, size_t block0, size_t block1,
-    const Ttuple &ptrs, Func &&func, size_t nthreads, bool last_contiguous)
+    const Ttuple &ptrs, Func &&func, uint32_t nthreads, bool last_contiguous)
   {
   ReduceType rt;
   if (shp.size()==0)
@@ -1339,8 +1318,8 @@ template<typename ReduceType, typename Func, typename Ttuple>
       ptrs, std::forward<Func>(func), last_contiguous));
   else
     {
-    Mutex mut;
-    execParallel(shp[0], nthreads, [&](size_t lo, size_t hi)
+    std::mutex mut;
+    par::pchunk(shp[0], [&](size_t lo, size_t hi)
       {
       auto locptrs = update_pointers(ptrs, str, 0, lo);
       auto locshp(shp);
@@ -1348,10 +1327,10 @@ template<typename ReduceType, typename Func, typename Ttuple>
       auto local_rt = applyReduceHelper<ReduceType>(0, locshp, str, block0,
         block1, locptrs, func, last_contiguous);
       {
-      LockGuard lock(mut);
+      std::lock_guard lock(mut);
       rt.reduceWith(local_rt);
       }
-      });
+      }, {.max_par = nthreads});
     }
   return rt;
   }
@@ -1414,14 +1393,14 @@ template<typename Ttuple, typename Func>
 template<typename Func, typename Ttuple>
   inline void applyHelper_with_index(const vector<size_t> &shp,
     const vector<vector<ptrdiff_t>> &str, const Ttuple &ptrs, Func &&func,
-    size_t nthreads, vector<size_t> &index)
+    uint32_t nthreads, vector<size_t> &index)
   {
   if (shp.size()==0)
     call_with_tuple_arg(std::forward<Func>(func), const_cast<const vector<size_t> &>(index), to_ref(ptrs));
   else if (nthreads==1)
     applyHelper_with_index(0, shp, str, ptrs, std::forward<Func>(func), index);
   else
-    execParallel(shp[0], nthreads, [&](size_t lo, size_t hi)
+    par::pchunk(shp[0], [&](size_t lo, size_t hi)
       {
       auto locptrs = update_pointers(ptrs, str, 0, lo);
       auto locshp(shp);
@@ -1429,7 +1408,7 @@ template<typename Func, typename Ttuple>
       auto locidx(index);
       locidx[0]=lo;
       applyHelper_with_index(0, locshp, str, locptrs, func, locidx);
-      });
+      }, {.max_par = nthreads});
   }
 template<typename Func, typename... Targs>
   void mav_apply_with_index(Func &&func, int nthreads, Targs... args)
@@ -1540,26 +1519,26 @@ template<typename Tptrs, typename Tinfos, typename Func>
 template<typename Tptrs, typename Tinfos, typename Func>
   DUCC_PAR_NOINLINE void flexible_mav_applyHelper(const vector<size_t> &shp,
     const vector<vector<ptrdiff_t>> &str, const Tptrs &ptrs,
-    const Tinfos &infos, Func &&func, size_t nthreads)
+    const Tinfos &infos, Func &&func, uint32_t nthreads)
   {
   if (shp.size()==0)
     call_with_tuple2(func, make_mavrefs(ptrs, infos));
   else if (nthreads==1)
     flexible_mav_applyHelper(0, shp, str, ptrs, infos, std::forward<Func>(func));
   else
-    execParallel(shp[0], nthreads, [&](size_t lo, size_t hi)
+    par::pchunk(shp[0], [&](size_t lo, size_t hi)
       {
       auto locptrs = update_pointers(ptrs, str, 0, lo);
       auto locshp(shp);
       locshp[0] = hi-lo;
       flexible_mav_applyHelper(0, locshp, str, locptrs, infos, func);
-      });
+      }, {.max_par = nthreads});
   }
 
 template<size_t ndim> struct Xdim { static constexpr size_t dim=ndim; };
 
 template<typename Ttuple, typename Tdim, typename Func>
-  void xflexible_mav_apply(const Ttuple &tuple, const Tdim &dim, Func &&func, size_t nthreads)
+  void xflexible_mav_apply(const Ttuple &tuple, const Tdim &dim, Func &&func, uint32_t nthreads)
   {
   auto fullinfos = tuple_transform2(tuple, dim, [](const auto &arg, const auto &dim)
                                     { return make_infos<remove_reference_t<decltype(dim)>::dim>(fmav_info(arg)); });
@@ -1574,7 +1553,7 @@ template<typename Ttuple, typename Tdim, typename Func>
   }
 
 template<size_t nd0, typename T0, typename Func>
-  void flexible_mav_apply(Func &&func, size_t nthreads, T0 &&m0)
+  void flexible_mav_apply(Func &&func, uint32_t nthreads, T0 &&m0)
   {
   xflexible_mav_apply(forward_as_tuple(m0),
                       forward_as_tuple(Xdim<nd0>()),
@@ -1582,7 +1561,7 @@ template<size_t nd0, typename T0, typename Func>
   }
 
 template<size_t nd0, size_t nd1, typename T0, typename T1, typename Func>
-  void flexible_mav_apply(Func &&func, size_t nthreads, T0 &&m0, T1 &&m1)
+  void flexible_mav_apply(Func &&func, uint32_t nthreads, T0 &&m0, T1 &&m1)
   {
   xflexible_mav_apply(forward_as_tuple(m0, m1),
                       forward_as_tuple(Xdim<nd0>(), Xdim<nd1>()),
@@ -1591,7 +1570,7 @@ template<size_t nd0, size_t nd1, typename T0, typename T1, typename Func>
 
 template<size_t nd0, size_t nd1, size_t nd2,
          typename T0, typename T1, typename T2, typename Func>
-  void flexible_mav_apply(Func &&func, size_t nthreads, T0 &&m0, T1 &&m1, T2 &&m2)
+  void flexible_mav_apply(Func &&func, uint32_t nthreads, T0 &&m0, T1 &&m1, T2 &&m2)
   {
   xflexible_mav_apply(forward_as_tuple(m0, m1, m2),
                       forward_as_tuple(Xdim<nd0>(), Xdim<nd1>(), Xdim<nd2>()),

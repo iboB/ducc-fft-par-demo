@@ -1,6 +1,6 @@
 #include "ducc-par/fft/fftnd_impl.h"
 
-namespace ducc::par{
+namespace ducc_par{
 namespace detail_fft {
 #define T double
 #include "ducc-par/fft/fft_inst_inc.h"
