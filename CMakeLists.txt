@@ -18,26 +18,47 @@ include(./get_cpm.cmake)
 
 #######################################
 # cmake lib
-CPMAddPackage(gh:iboB/icm@1.5.5)
+CPMAddPackage(gh:iboB/icm@1.5.7)
 
 list(APPEND CMAKE_MODULE_PATH
     "${icm_SOURCE_DIR}"
     "${CMAKE_CURRENT_SOURCE_DIR}/cmake"
 )
 
+include(icm_cpu_arch)
+
 ######################
 # compiler settings
 
-set(CMAKE_CXX_STANDARD 23)
+set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_EXTENSIONS OFF)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
-set(CMAKE_C_STANDARD 11)
-set(CMAKE_C_EXTENSIONS OFF)
-set(CMAKE_C_STANDARD_REQUIRED ON)
+icm_get_native_arch_flag(nativeArchFlag)
+function(optimize_target_for_numeric_compute tgt)
+    if(MSVC)
+        set(perf_options
+            /Ox /fp:contract /fp:except- /GF /Gy /GS- /Oi /Ot /Oy
+            # /Ob3 # teporarily disabled until we figure out how to deal with D9025
+        )
+    else()
+        set(perf_options
+            -funroll-loops -ffp-contract=fast -fno-math-errno -fno-signed-zeros -fno-trapping-math
+            -fassociative-math -freciprocal-math -fmerge-all-constants -ftree-vectorize -O3
+        )
+        if (CMAKE_CXX_COMPILER_ID MATCHES "GNU")
+            # gcc specific
+            list(APPEND perf_options
+                -fimplicit-constexpr -fcx-limited-range
+            )
+        endif()
+    endif()
+
+    target_compile_options(${tgt} PRIVATE $<$<CONFIG:Release,RelWithDebInfo>:${perf_options}>)
+    target_compile_options(${tgt} PRIVATE ${nativeArchFlag})
+endfunction()
 
 if(MSVC)
-    # /Zc:preprocessor - incompatible with Windows.h
     add_compile_options(
         -W4
         -D_CRT_SECURE_NO_WARNINGS -Zc:__cplusplus -permissive-
@@ -99,9 +120,28 @@ enable_testing()
 
 ######################
 # packages
-CPMAddPackage(gh:iboB/splat@1.3.4)
-CPMAddPackage(gh:iboB/itlib@1.11.7)
+CPMAddPackage(gh:iboB/splat@1.3.5)
+CPMAddPackage(gh:iboB/picobench@2.08)
+
+CPMAddPackage(NAME ducc0
+    GITHUB_REPOSITORY mreineck/ducc
+    VERSION 0.39.1
+    GIT_TAG ducc0_0_39_1
+    DOWNLOAD_ONLY YES
+)
+add_library(ducc0 STATIC
+    ${ducc0_SOURCE_DIR}/src/ducc0/fft/fft_inst1.cc
+    ${ducc0_SOURCE_DIR}/src/ducc0/fft/fft_inst2.cc
+    ${ducc0_SOURCE_DIR}/src/ducc0/infra/threading.cc
+    ${ducc0_SOURCE_DIR}/src/ducc0/infra/mav.cc
+    ${ducc0_SOURCE_DIR}/src/ducc0/infra/string_utils.cc
+)
+target_include_directories(ducc0 PUBLIC
+    ${ducc0_SOURCE_DIR}/src
+)
+optimize_target_for_numeric_compute(ducc0)
+add_library(ducc::original ALIAS ducc0)
 
 ######################
 # subdirs
-add_subdirectory(scratch)
+add_subdirectory(bench)
