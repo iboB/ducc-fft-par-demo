@@ -144,4 +144,6 @@ add_library(ducc::original ALIAS ducc0)
 
 ######################
 # subdirs
+add_subdirectory(ducc-fft-par)
+add_subdirectory(demo)
 add_subdirectory(bench)
