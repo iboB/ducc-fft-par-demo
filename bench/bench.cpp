@@ -6,12 +6,15 @@
 
 #include <ducc-par/fft/fft.h>
 
+#include <par/prun.hpp>
+
 #include <iostream>
 #include <atomic>
 #include <random>
 #include <numeric>
 #include <bit>
 #include <map>
+#include <thread>
 
 #define PICOBENCH_IMPLEMENT
 #include <picobench/picobench.hpp>
@@ -21,8 +24,16 @@ std::map<int, std::vector<std::complex<float>>> random_data_for_iterations;
 static constexpr uint32_t NUM_THREADS = 8;
 
 void warmup() {
+    par::thread_pool::init_global(std::min(std::thread::hardware_concurrency(), NUM_THREADS));
+
+    // actual number of threads
+    const auto num_threads = par::thread_pool::global().num_threads();
+
     std::atomic_uint32_t counter = 0;
-    ducc0::execStatic(NUM_THREADS, NUM_THREADS, 1, [&](ducc0::Scheduler&) {
+    par::prun({.sched = par::schedule_static}, [&](uint32_t) {
+        ++counter;
+    });
+    ducc0::execStatic(NUM_THREADS, num_threads, 1, [&](ducc0::Scheduler&) {
         ++counter;
     });
 }
