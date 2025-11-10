@@ -1,4 +1,4 @@
-/** \file ducc-par/infra/aligned_array.h
+/** \file ducc0/infra/aligned_array.h
  *
  * \copyright Copyright (C) 2019-2022 Max-Planck-Society
  * \author Martin Reinecke
@@ -49,15 +49,15 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *  Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
  */
 
-#ifndef DUCC_PAR_ALIGNED_ARRAY_H
-#define DUCC_PAR_ALIGNED_ARRAY_H
+#ifndef DUCC0_ALIGNED_ARRAY_H
+#define DUCC0_ALIGNED_ARRAY_H
 
 #include <algorithm>
 #include <cstdlib>
 #include <cstddef>
 #include <new>
 
-namespace ducc_par {
+namespace ducc0 {
 
 namespace detail_aligned_array {
 
@@ -66,7 +66,7 @@ using namespace std;
 // std::aligned_alloc is a bit cursed ... it doesn't exist on MacOS < 10.15
 // and in musl. Let's unconditionally work around it for now.
 //#if ((__cplusplus >= 201703L) && (!defined(__APPLE__)))
-#define DUCC_PAR_WORKAROUND_ALIGNED_ALLOC
+#define DUCC0_WORKAROUND_ALIGNED_ALLOC
 //#endif
 
 /// Bare bones array class.
@@ -90,7 +90,7 @@ template<typename T, size_t alignment=alignof(T)> class array_base
       else
         {
         if (num==0) return nullptr;
-#if (!defined(DUCC_PAR_WORKAROUND_ALIGNED_ALLOC))
+#if (!defined(DUCC0_WORKAROUND_ALIGNED_ALLOC))
         // aligned_alloc requires the allocated size to be a multiple of the
         // requested alignment, so increase size if necessary
         void *res = aligned_alloc(alignment,((num*sizeof(T)+alignment-1)/alignment)*alignment);
@@ -109,23 +109,23 @@ template<typename T, size_t alignment=alignof(T)> class array_base
       if constexpr(alignment<=alignof(max_align_t))
         free(ptr);
       else
-#if (!defined(DUCC_PAR_WORKAROUND_ALIGNED_ALLOC))
+#if (!defined(DUCC0_WORKAROUND_ALIGNED_ALLOC))
         free(ptr);
 #else
         if (ptr) free((reinterpret_cast<void**>(ptr))[-1]);
 #endif
       }
 
-#undef DUCC_PAR_WORKAROUND_ALIGNED_ALLOC
+#undef DUCC0_WORKAROUND_ALIGNED_ALLOC
 
   public:
     /// Creates a zero-sized array with no associated memory.
     array_base() : p(nullptr), sz(0) {}
     /// Creates an array with \a n entries.
     /** \note Memory is not initialized! */
-    explicit array_base(size_t n) : p(ralloc(n)), sz(n) {}
+    array_base(size_t n) : p(ralloc(n)), sz(n) {}
     array_base(const array_base &) = delete;
-    array_base(array_base &&other) noexcept
+    array_base(array_base &&other)
       : p(other.p), sz(other.sz)
       { other.p=nullptr; other.sz=0; }
     ~array_base() { dealloc(p); }

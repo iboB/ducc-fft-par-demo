@@ -1,4 +1,4 @@
-/** \file ducc-par/infra/simd.h
+/** \file ducc0/infra/simd.h
  *  Functionality which approximates future standard C++ SIMD classes.
  *
  *  For details see section 9 of https://wg21.link/N4808
@@ -52,13 +52,13 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *  Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
  */
 
-#ifndef DUCC_PAR_SIMD_H
-#define DUCC_PAR_SIMD_H
+#ifndef DUCC0_SIMD_H
+#define DUCC0_SIMD_H
 
 // for some reason, MacOS doesn't seem to have stdx::simd_abi::deduce_t (yet?),
 // so we don't use the standard library SIMD support on MacOS.
 // In fact, we only trust libstdc++ at the moment to implement this fully.
-#if (!defined (DUCC_PAR_NO_SIMD)) && __has_include(<experimental/simd>) && defined(__GLIBCXX__)
+#if (!defined (DUCC0_NO_SIMD)) && __has_include(<experimental/simd>) && defined(__GLIBCXX__)
 #include <cstdint>
 #include <cstdlib>
 #include <cmath>
@@ -66,7 +66,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <type_traits>
 #include <experimental/simd>
 
-namespace ducc_par {
+namespace ducc0 {
 
 namespace detail_simd {
 
@@ -127,20 +127,20 @@ using detail_simd::blend;
 #else
 
 // only enable SIMD support for gcc>=5.0 and clang>=5.0
-#ifndef DUCC_PAR_NO_SIMD
-#define DUCC_PAR_NO_SIMD
+#ifndef DUCC0_NO_SIMD
+#define DUCC0_NO_SIMD
 #if defined(__clang__)
 // AppleClang has their own version numbering
 #ifdef __apple_build_version__
 #  if (__clang_major__ > 9) || (__clang_major__ == 9 && __clang_minor__ >= 1)
-#     undef DUCC_PAR_NO_SIMD
+#     undef DUCC0_NO_SIMD
 #  endif
 #elif __clang_major__ >= 5
-#  undef DUCC_PAR_NO_SIMD
+#  undef DUCC0_NO_SIMD
 #endif
 #elif defined(__GNUC__)
 #if __GNUC__>=5
-#undef DUCC_PAR_NO_SIMD
+#undef DUCC0_NO_SIMD
 #endif
 #endif
 #endif
@@ -149,9 +149,9 @@ using detail_simd::blend;
 #include <cmath>
 #include <algorithm>
 
-#ifndef DUCC_PAR_NO_SIMD
+#ifndef DUCC0_NO_SIMD
 
-#define DUCC_PAR_HOMEGROWN_SIMD
+#define DUCC0_HOMEGROWN_SIMD
 
 #if defined(__SSE2__)  // we are on an x86 platform and we have vector types
 #include <x86intrin.h>
@@ -161,14 +161,14 @@ using detail_simd::blend;
 #if defined(__ARM_FEATURE_SVE) && defined(__ARM_FEATURE_SVE_BITS)
 #if __ARM_FEATURE_SVE_BITS>0
 // OK, we can use SVE
-#define DUCC_PAR_USE_SVE
+#define DUCC0_USE_SVE
 #include <arm_sve.h>
 #endif
 #endif
-#ifndef DUCC_PAR_USE_SVE
+#ifndef DUCC0_USE_SVE
 // see if we can use Neon
 #if defined(__ARM_NEON)
-#define DUCC_PAR_USE_NEON
+#define DUCC0_USE_NEON
 #include <arm_neon.h>
 #endif
 #endif
@@ -176,14 +176,14 @@ using detail_simd::blend;
 
 #endif
 
-namespace ducc_par {
+namespace ducc0 {
 
 namespace detail_simd {
 
 /// true iff SIMD support is provided for \a T.
 template<typename T> constexpr inline bool vectorizable = false;
-#if (!defined(DUCC_PAR_NO_SIMD))
-#if defined(__SSE2__) || defined (DUCC_PAR_USE_SVE) || defined (DUCC_PAR_USE_NEON)
+#if (!defined(DUCC0_NO_SIMD))
+#if defined(__SSE2__) || defined (DUCC0_USE_SVE) || defined (DUCC0_USE_NEON)
 template<> constexpr inline bool vectorizable<float> = true;
 template<> constexpr inline bool vectorizable<double> = true;
 #endif
@@ -424,7 +424,7 @@ template<typename T> class helper_<T,1>
     static bool mask_all(Tm v) { return v; }
   };
 
-#ifndef DUCC_PAR_NO_SIMD
+#ifndef DUCC0_NO_SIMD
 
 #if defined(__AVX512F__)
 template<> constexpr inline bool simd_exists<double,8> = true;
@@ -661,7 +661,7 @@ template<> class helper_<float,4>
   };
 #endif
 
-#if defined(DUCC_PAR_USE_SVE)
+#if defined(DUCC0_USE_SVE)
 template<typename T, size_t len> class gnuvec_helper
   {
   public:
@@ -737,7 +737,7 @@ template<> constexpr inline bool simd_exists<float,__ARM_FEATURE_SVE_BITS/32> = 
 template<> class helper_<float,__ARM_FEATURE_SVE_BITS/32>: public gnuvec_helper<float, __ARM_FEATURE_SVE_BITS/32> {};
 #endif
 
-#if defined(DUCC_PAR_USE_NEON)
+#if defined(DUCC0_USE_NEON)
 template<> constexpr inline bool simd_exists<double,2> = true;
 template<> class helper_<double,2>
   {
@@ -830,15 +830,15 @@ template<typename T> using native_simd = vtp<T,vectorlen<T,64>>;
 template<typename T> using native_simd = vtp<T,vectorlen<T,32>>;
 #elif defined(__SSE2__)
 template<typename T> using native_simd = vtp<T,vectorlen<T,16>>;
-#elif defined(DUCC_PAR_USE_SVE)
+#elif defined(DUCC0_USE_SVE)
 template<typename T> using native_simd = vtp<T,vectorlen<T,__ARM_FEATURE_SVE_BITS/8>>;
-#elif defined(DUCC_PAR_USE_NEON)
+#elif defined(DUCC0_USE_NEON)
 template<typename T> using native_simd = vtp<T,vectorlen<T,16>>;
 #else
 template<typename T> using native_simd = vtp<T,1>;
 #endif
 
-#else // DUCC_PAR_NO_SIMD is defined
+#else // DUCC0_NO_SIMD is defined
 /// The SIMD type for \a T with the largest vector length on this platform.
 template<typename T> using native_simd = vtp<T,1>;
 #endif

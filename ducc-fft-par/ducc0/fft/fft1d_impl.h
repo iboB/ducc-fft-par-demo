@@ -56,8 +56,8 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *  Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
  */
 
-#ifndef DUCC_PAR_FFT1D_IMPL_H
-#define DUCC_PAR_FFT1D_IMPL_H
+#ifndef DUCC0_FFT1D_IMPL_H
+#define DUCC0_FFT1D_IMPL_H
 
 #include <memory>
 #include <cstddef>
@@ -68,15 +68,15 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <vector>
 #include <typeinfo>
 #include <typeindex>
-#include "ducc-par/infra/useful_macros.h"
-#include "ducc-par/math/cmplx.h"
-#include "ducc-par/infra/error_handling.h"
-#include "ducc-par/infra/aligned_array.h"
-#include "ducc-par/infra/simd.h"
-#include "ducc-par/math/unity_roots.h"
-#include "ducc-par/fft/fft.h"
+#include "ducc0/infra/useful_macros.h"
+#include "ducc0/math/cmplx.h"
+#include "ducc0/infra/error_handling.h"
+#include "ducc0/infra/aligned_array.h"
+#include "ducc0/infra/simd.h"
+#include "ducc0/math/unity_roots.h"
+#include "ducc0/fft/fft.h"
 
-namespace ducc_par {
+namespace ducc0 {
 
 namespace detail_fft {
 
@@ -167,7 +167,7 @@ template<bool fwd, typename T> void ROTX90(Cmplx<T> &a)
                        : exec_<false>(in1, copy1, buf1, nthreads); \
             } \
           } \
-      PAR_MR_fail("impossible vector length requested"); \
+      MR_fail("impossible vector length requested"); \
       }
 
 template <typename Tfs> class cfftp1: public cfftpass<Tfs>
@@ -195,8 +195,8 @@ template <typename Tfs> class cfftp2: public cfftpass<Tfs>
     auto WA(size_t i) const
       { return wa[i-1]; }
 
-    template<bool fwd, typename Tcd> Tcd *exec_ (const Tcd * DUCC_PAR_RESTRICT cc,
-      Tcd * DUCC_PAR_RESTRICT ch, Tcd * /*buf*/, uint32_t /*nthreads*/) const
+    template<bool fwd, typename Tcd> Tcd *exec_ (const Tcd * DUCC0_RESTRICT cc,
+      Tcd * DUCC0_RESTRICT ch, Tcd * /*buf*/, uint32_t /*nthreads*/) const
       {
       if (ido==1)
         {
@@ -237,7 +237,7 @@ template <typename Tfs> class cfftp2: public cfftpass<Tfs>
       {
       size_t N=ip*l1*ido;
       size_t rfct = roots->size()/N;
-      PAR_MR_assert(roots->size()==N*rfct, "mismatch");
+      MR_assert(roots->size()==N*rfct, "mismatch");
       for (size_t i=1; i<ido; ++i)
         wa[i-1] = (*roots)[rfct*l1*i];
       }
@@ -262,7 +262,7 @@ template <typename Tfs> class cfftp3: public cfftpass<Tfs>
       { return wa[x+(i-1)*(ip-1)]; }
 
     template<bool fwd, typename Tcd> Tcd *exec_
-      (const Tcd * DUCC_PAR_RESTRICT cc, Tcd * DUCC_PAR_RESTRICT ch, Tcd * /*buf*/,
+      (const Tcd * DUCC0_RESTRICT cc, Tcd * DUCC0_RESTRICT ch, Tcd * /*buf*/,
       uint32_t /*nthreads*/) const
       {
       constexpr Tfs tw1r=-0.5,
@@ -324,7 +324,7 @@ template <typename Tfs> class cfftp3: public cfftpass<Tfs>
       {
       size_t N=ip*l1*ido;
       size_t rfct = roots->size()/N;
-      PAR_MR_assert(roots->size()==N*rfct, "mismatch");
+      MR_assert(roots->size()==N*rfct, "mismatch");
       for (size_t i=1; i<ido; ++i)
         for (size_t j=1; j<ip; ++j)
           wa[(j-1)+(i-1)*(ip-1)] = (*roots)[rfct*j*l1*i];
@@ -350,7 +350,7 @@ template <typename Tfs> class cfftp4: public cfftpass<Tfs>
       { return wa[x+(i-1)*(ip-1)]; }
 
     template<bool fwd, typename Tcd> Tcd *exec_
-      (const Tcd * DUCC_PAR_RESTRICT cc, Tcd * DUCC_PAR_RESTRICT ch, Tcd * /*buf*/,
+      (const Tcd * DUCC0_RESTRICT cc, Tcd * DUCC0_RESTRICT ch, Tcd * /*buf*/,
       uint32_t /*nthreads*/) const
       {
       if (ido==1)
@@ -408,7 +408,7 @@ template <typename Tfs> class cfftp4: public cfftpass<Tfs>
       {
       size_t N=ip*l1*ido;
       size_t rfct = roots->size()/N;
-      PAR_MR_assert(roots->size()==N*rfct, "mismatch");
+      MR_assert(roots->size()==N*rfct, "mismatch");
       for (size_t i=1; i<ido; ++i)
         for (size_t j=1; j<ip; ++j)
           wa[(j-1)+(i-1)*(ip-1)] = (*roots)[rfct*j*l1*i];
@@ -434,7 +434,7 @@ template <typename Tfs> class cfftp5: public cfftpass<Tfs>
       { return wa[x+(i-1)*(ip-1)]; }
 
     template<bool fwd, typename Tcd> Tcd *exec_
-      (const Tcd * DUCC_PAR_RESTRICT cc, Tcd * DUCC_PAR_RESTRICT ch, Tcd * /*buf*/,
+      (const Tcd * DUCC0_RESTRICT cc, Tcd * DUCC0_RESTRICT ch, Tcd * /*buf*/,
       uint32_t /*nthreads*/) const
       {
       constexpr Tfs tw1r= Tfs(0.3090169943749474241022934171828191L),
@@ -511,7 +511,7 @@ template <typename Tfs> class cfftp5: public cfftpass<Tfs>
       {
       size_t N=ip*l1*ido;
       auto rfct = roots->size()/N;
-      PAR_MR_assert(roots->size()==N*rfct, "mismatch");
+      MR_assert(roots->size()==N*rfct, "mismatch");
       for (size_t i=1; i<ido; ++i)
         for (size_t j=1; j<ip; ++j)
           wa[(j-1)+(i-1)*(ip-1)] = (*roots)[rfct*j*l1*i];
@@ -537,7 +537,7 @@ template <typename Tfs> class cfftp7: public cfftpass<Tfs>
       { return wa[x+(i-1)*(ip-1)]; }
 
     template<bool fwd, typename Tcd> Tcd *exec_
-      (const Tcd * DUCC_PAR_RESTRICT cc, Tcd * DUCC_PAR_RESTRICT ch, Tcd * /*buf*/,
+      (const Tcd * DUCC0_RESTRICT cc, Tcd * DUCC0_RESTRICT ch, Tcd * /*buf*/,
       uint32_t /*nthreads*/) const
       {
       constexpr Tfs tw1r= Tfs(0.6234898018587335305250048840042398L),
@@ -619,7 +619,7 @@ template <typename Tfs> class cfftp7: public cfftpass<Tfs>
       {
       size_t N=ip*l1*ido;
       auto rfct = roots->size()/N;
-      PAR_MR_assert(roots->size()==N*rfct, "mismatch");
+      MR_assert(roots->size()==N*rfct, "mismatch");
       for (size_t i=1; i<ido; ++i)
         for (size_t j=1; j<ip; ++j)
           wa[(j-1)+(i-1)*(ip-1)] = (*roots)[rfct*j*l1*i];
@@ -662,7 +662,7 @@ template <typename Tfs> class cfftp8: public cfftpass<Tfs>
       }
 
     template<bool fwd, typename Tcd> Tcd *exec_
-      (Tcd * DUCC_PAR_RESTRICT cc, Tcd * DUCC_PAR_RESTRICT ch, Tcd * /*buf*/, uint32_t /*nthreads*/) const
+      (Tcd * DUCC0_RESTRICT cc, Tcd * DUCC0_RESTRICT ch, Tcd * /*buf*/, uint32_t /*nthreads*/) const
       {
       if (l1==1)
         {
@@ -807,7 +807,7 @@ template <typename Tfs> class cfftp8: public cfftpass<Tfs>
       {
       size_t N=ip*l1*ido;
       auto rfct = roots->size()/N;
-      PAR_MR_assert(roots->size()==N*rfct, "mismatch");
+      MR_assert(roots->size()==N*rfct, "mismatch");
       for (size_t i=1; i<ido; ++i)
         for (size_t j=1; j<ip; ++j)
           wa[(j-1)+(i-1)*(ip-1)] = (*roots)[rfct*j*l1*i];
@@ -833,7 +833,7 @@ template <typename Tfs> class cfftp11: public cfftpass<Tfs>
       { return wa[x+(i-1)*(ip-1)]; }
 
     template<bool fwd, typename Tcd> [[gnu::hot]] Tcd *exec_
-      (const Tcd * DUCC_PAR_RESTRICT cc, Tcd * DUCC_PAR_RESTRICT ch, Tcd * /*buf*/,
+      (const Tcd * DUCC0_RESTRICT cc, Tcd * DUCC0_RESTRICT ch, Tcd * /*buf*/,
       uint32_t /*nthreads*/) const
       {
       constexpr Tfs tw1r= Tfs(0.8412535328311811688618116489193677L),
@@ -925,7 +925,7 @@ template <typename Tfs> class cfftp11: public cfftpass<Tfs>
       {
       size_t N=ip*l1*ido;
       auto rfct = roots->size()/N;
-      PAR_MR_assert(roots->size()==N*rfct, "mismatch");
+      MR_assert(roots->size()==N*rfct, "mismatch");
       for (size_t i=1; i<ido; ++i)
         for (size_t j=1; j<ip; ++j)
           wa[(j-1)+(i-1)*(ip-1)] = (*roots)[rfct*j*l1*i];
@@ -952,7 +952,7 @@ template <typename Tfs> class cfftpg: public cfftpass<Tfs>
       { return wa[i-1+x*(ido-1)]; }
 
     template<bool fwd, typename Tcd> Tcd *exec_
-      (Tcd * DUCC_PAR_RESTRICT cc, Tcd * DUCC_PAR_RESTRICT ch, Tcd * /*buf*/, uint32_t /*nthreads*/) const
+      (Tcd * DUCC0_RESTRICT cc, Tcd * DUCC0_RESTRICT ch, Tcd * /*buf*/, uint32_t /*nthreads*/) const
       {
       size_t ipph = (ip+1)/2;
       size_t idl1 = ido*l1;
@@ -1061,10 +1061,10 @@ template <typename Tfs> class cfftpg: public cfftpass<Tfs>
     cfftpg(size_t l1_, size_t ido_, size_t ip_, const Troots<Tfs> &roots)
       : l1(l1_), ido(ido_), ip(ip_), wa((ip-1)*(ido-1)), csarr(ip)
       {
-      PAR_MR_assert((ip&1)&&(ip>=5), "need an odd number >=5");
+      MR_assert((ip&1)&&(ip>=5), "need an odd number >=5");
       size_t N=ip*l1*ido;
       auto rfct = roots->size()/N;
-      PAR_MR_assert(roots->size()==N*rfct, "mismatch");
+      MR_assert(roots->size()==N*rfct, "mismatch");
       for (size_t j=1; j<ip; ++j)
         for (size_t i=1; i<ido; ++i)
           wa[(j-1)*(ido-1)+i-1] = (*roots)[rfct*j*l1*i];
@@ -1096,8 +1096,8 @@ template <typename Tfs> class cfftpblue: public cfftpass<Tfs>
       { return wa[i-1+x*(ido-1)]; }
 
     template<bool fwd, typename Tcd> Tcd *exec_
-      (Tcd * DUCC_PAR_RESTRICT cc, Tcd * DUCC_PAR_RESTRICT ch,
-       Tcd * DUCC_PAR_RESTRICT buf, uint32_t nthreads) const
+      (Tcd * DUCC0_RESTRICT cc, Tcd * DUCC0_RESTRICT ch,
+       Tcd * DUCC0_RESTRICT buf, uint32_t nthreads) const
       {
       static const auto ti=tidx<Tcd *>();
       Tcd *akf = &buf[0];
@@ -1176,7 +1176,7 @@ template <typename Tfs> class cfftpblue: public cfftpass<Tfs>
       {
       size_t N=ip*l1*ido;
       auto rfct = roots->size()/N;
-      PAR_MR_assert(roots->size()==N*rfct, "mismatch");
+      MR_assert(roots->size()==N*rfct, "mismatch");
       for (size_t j=1; j<ip; ++j)
         for (size_t i=1; i<ido; ++i)
           wa[(j-1)*(ido-1)+i-1] = (*roots)[rfct*j*l1*i];
@@ -1359,7 +1359,7 @@ template <typename Tfs> class cfft_multipass: public cfftpass<Tfs>
             return cc;
             }
 
-PAR_MR_fail("must not get here");
+MR_fail("must not get here");
 #if 0
 //FIXME this code path is currently unused
           aligned_array<Tcv> tbuf(2*ip+bufsize());
@@ -1516,7 +1516,7 @@ PAR_MR_fail("must not get here");
             return cc;
             }
 
-PAR_MR_fail("must not get here");
+MR_fail("must not get here");
 #if 0
 //FIXME this code path is currently unused
           auto cc2 = &buf[0];
@@ -1600,7 +1600,7 @@ PAR_MR_fail("must not get here");
       {
       size_t N=ip*l1*ido;
       rfct = roots->size()/N;
-      PAR_MR_assert(roots->size()==N*rfct, "mismatch");
+      MR_assert(roots->size()==N*rfct, "mismatch");
 
       // FIXME TBD
 // do we need the vectorize flag at all?
@@ -1715,7 +1715,7 @@ template <size_t vlen, typename Tfs> class cfftp_vecpass: public cfftpass<Tfs>
       : ip(ip_), spass(cfftpass<Tfs>::make_pass(1, ip/vlen, vlen, roots)),
         vpass(cfftpass<Tfs>::make_pass(1, 1, ip/vlen, roots)), bufsz(0)
       {
-      PAR_MR_assert((ip/vlen)*vlen==ip, "cannot vectorize this size");
+      MR_assert((ip/vlen)*vlen==ip, "cannot vectorize this size");
       bufsz = 2*(ip/vlen)+7+7;
       bufsz += max(vpass->bufsize(),(spass->bufsize()+vlen-1)/vlen); // buffers for subpasses
       bufsz *= vlen; // since we specify in terms of Tcs
@@ -1729,7 +1729,7 @@ template <size_t vlen, typename Tfs> class cfftp_vecpass: public cfftpass<Tfs>
       bool fwd, uint32_t nthreads=1) const
       {
       static const auto tics = tidx<Tcs *>();
-      PAR_MR_assert(ti==tics, "bad input type");
+      MR_assert(ti==tics, "bad input type");
       auto in1 = static_cast<Tcs *>(in);
       auto copy1 = static_cast<Tcs *>(copy);
       auto buf1 = static_cast<Tcs *>(buf);
@@ -1741,7 +1741,7 @@ template <size_t vlen, typename Tfs> class cfftp_vecpass: public cfftpass<Tfs>
 template<typename Tfs> Tcpass<Tfs> cfftpass<Tfs>::make_pass(size_t l1,
   size_t ido, size_t ip, const Troots<Tfs> &roots, bool vectorize)
   {
-  PAR_MR_assert(ip>=1, "no zero-sized FFTs");
+  MR_assert(ip>=1, "no zero-sized FFTs");
   // do we have an 1D vectorizable FFT?
   if (vectorize && (ip>300)&& (ip<=100000) && (l1==1) && (ido==1))
     {
@@ -1853,7 +1853,7 @@ template<typename Tfs> Tcpass<Tfs> cfftpass<Tfs>::make_pass(size_t l1,
                        : exec_<false>(in1, copy1, buf1, nthreads); \
             } \
           } \
-      PAR_MR_fail("impossible vector length requested"); \
+      MR_fail("impossible vector length requested"); \
       }
 
 /* (a+ib) = conj(c+id) * (e+if) */
@@ -1884,8 +1884,8 @@ template <typename Tfs> class rfftp2: public rfftpass<Tfs>
     auto WA(size_t x, size_t i) const
       { return wa[i+x*(ido-1)]; }
 
-    template<bool fwd, typename Tfd> Tfd *exec_ (Tfd * DUCC_PAR_RESTRICT cc,
-      Tfd * DUCC_PAR_RESTRICT ch, Tfd * /*buf*/, uint32_t /*nthreads*/) const
+    template<bool fwd, typename Tfd> Tfd *exec_ (Tfd * DUCC0_RESTRICT cc,
+      Tfd * DUCC0_RESTRICT ch, Tfd * /*buf*/, uint32_t /*nthreads*/) const
       {
       if constexpr(fwd)
         {
@@ -1947,7 +1947,7 @@ template <typename Tfs> class rfftp2: public rfftpass<Tfs>
       {
       size_t N=ip*l1*ido;
       size_t rfct = roots->size()/N;
-      PAR_MR_assert(roots->size()==N*rfct, "mismatch");
+      MR_assert(roots->size()==N*rfct, "mismatch");
       for (size_t j=1; j<ip; ++j)
         for (size_t i=1; i<=(ido-1)/2; ++i)
           {
@@ -1980,8 +1980,8 @@ template <typename Tfs> class rfftp3: public rfftpass<Tfs>
     auto WA(size_t x, size_t i) const
       { return wa[i+x*(ido-1)]; }
 
-    template<bool fwd, typename Tfd> Tfd *exec_ (Tfd * DUCC_PAR_RESTRICT cc,
-      Tfd * DUCC_PAR_RESTRICT ch, Tfd * /*buf*/, uint32_t /*nthreads*/) const
+    template<bool fwd, typename Tfd> Tfd *exec_ (Tfd * DUCC0_RESTRICT cc,
+      Tfd * DUCC0_RESTRICT ch, Tfd * /*buf*/, uint32_t /*nthreads*/) const
       {
       constexpr Tfs taur=Tfs(-0.5),
                     taui=Tfs(0.8660254037844386467637231707529362L);
@@ -2058,10 +2058,10 @@ template <typename Tfs> class rfftp3: public rfftpass<Tfs>
     rfftp3(size_t l1_, size_t ido_, const Troots<Tfs> &roots)
       : l1(l1_), ido(ido_), wa((ip-1)*(ido-1))
       {
-      PAR_MR_assert(ido&1, "ido must be odd");
+      MR_assert(ido&1, "ido must be odd");
       size_t N=ip*l1*ido;
       size_t rfct = roots->size()/N;
-      PAR_MR_assert(roots->size()==N*rfct, "mismatch");
+      MR_assert(roots->size()==N*rfct, "mismatch");
       for (size_t j=1; j<ip; ++j)
         for (size_t i=1; i<=(ido-1)/2; ++i)
           {
@@ -2088,8 +2088,8 @@ template <typename Tfs> class rfftp4: public rfftpass<Tfs>
     auto WA(size_t x, size_t i) const
       { return wa[i+x*(ido-1)]; }
 
-    template<bool fwd, typename Tfd> Tfd *exec_ (Tfd * DUCC_PAR_RESTRICT cc,
-      Tfd * DUCC_PAR_RESTRICT ch, Tfd * /*buf*/, uint32_t /*nthreads*/) const
+    template<bool fwd, typename Tfd> Tfd *exec_ (Tfd * DUCC0_RESTRICT cc,
+      Tfd * DUCC0_RESTRICT ch, Tfd * /*buf*/, uint32_t /*nthreads*/) const
       {
       if constexpr(fwd)
         {
@@ -2189,7 +2189,7 @@ template <typename Tfs> class rfftp4: public rfftpass<Tfs>
       {
       size_t N=ip*l1*ido;
       size_t rfct = roots->size()/N;
-      PAR_MR_assert(roots->size()==N*rfct, "mismatch");
+      MR_assert(roots->size()==N*rfct, "mismatch");
       for (size_t j=1; j<ip; ++j)
         for (size_t i=1; i<=(ido-1)/2; ++i)
           {
@@ -2216,8 +2216,8 @@ template <typename Tfs> class rfftp5: public rfftpass<Tfs>
     auto WA(size_t x, size_t i) const
       { return wa[i+x*(ido-1)]; }
 
-    template<bool fwd, typename Tfd> Tfd *exec_ (Tfd * DUCC_PAR_RESTRICT cc,
-      Tfd * DUCC_PAR_RESTRICT ch, Tfd * /*buf*/, uint32_t /*nthreads*/) const
+    template<bool fwd, typename Tfd> Tfd *exec_ (Tfd * DUCC0_RESTRICT cc,
+      Tfd * DUCC0_RESTRICT ch, Tfd * /*buf*/, uint32_t /*nthreads*/) const
       {
       constexpr Tfs tr11= Tfs(0.3090169943749474241022934171828191L),
                     ti11= Tfs(0.9510565162951535721164393333793821L),
@@ -2326,10 +2326,10 @@ template <typename Tfs> class rfftp5: public rfftpass<Tfs>
     rfftp5(size_t l1_, size_t ido_, const Troots<Tfs> &roots)
       : l1(l1_), ido(ido_), wa((ip-1)*(ido-1))
       {
-      PAR_MR_assert(ido&1, "ido must be odd");
+      MR_assert(ido&1, "ido must be odd");
       size_t N=ip*l1*ido;
       size_t rfct = roots->size()/N;
-      PAR_MR_assert(roots->size()==N*rfct, "mismatch");
+      MR_assert(roots->size()==N*rfct, "mismatch");
       for (size_t j=1; j<ip; ++j)
         for (size_t i=1; i<=(ido-1)/2; ++i)
           {
@@ -2353,8 +2353,8 @@ template <typename Tfs> class rfftpg: public rfftpass<Tfs>
     size_t ip;
     aligned_array<Tfs> wa, csarr;
 
-    template<bool fwd, typename Tfd> Tfd *exec_ (Tfd * DUCC_PAR_RESTRICT cc,
-      Tfd * DUCC_PAR_RESTRICT ch, Tfd * /*buf*/, uint32_t /*nthreads*/) const
+    template<bool fwd, typename Tfd> Tfd *exec_ (Tfd * DUCC0_RESTRICT cc,
+      Tfd * DUCC0_RESTRICT ch, Tfd * /*buf*/, uint32_t /*nthreads*/) const
       {
       if constexpr(fwd)
         {
@@ -2633,10 +2633,10 @@ template <typename Tfs> class rfftpg: public rfftpass<Tfs>
     rfftpg(size_t l1_, size_t ido_, size_t ip_, const Troots<Tfs> &roots)
       : l1(l1_), ido(ido_), ip(ip_), wa((ip-1)*(ido-1)), csarr(2*ip)
       {
-      PAR_MR_assert(ido&1, "ido must be odd");
+      MR_assert(ido&1, "ido must be odd");
       size_t N=ip*l1*ido;
       size_t rfct = roots->size()/N;
-      PAR_MR_assert(roots->size()==N*rfct, "mismatch");
+      MR_assert(roots->size()==N*rfct, "mismatch");
       for (size_t j=1; j<ip; ++j)
         for (size_t i=1; i<=(ido-1)/2; ++i)
           {
@@ -2677,8 +2677,8 @@ template <typename Tfs> class rfftpblue: public rfftpass<Tfs>
       { return wa[i+x*(ido-1)]; }
 
     template<bool fwd, typename Tfd> Tfd *exec_
-      (Tfd * DUCC_PAR_RESTRICT cc, Tfd * DUCC_PAR_RESTRICT ch,
-       Tfd * DUCC_PAR_RESTRICT buf_, uint32_t nthreads) const
+      (Tfd * DUCC0_RESTRICT cc, Tfd * DUCC0_RESTRICT ch,
+       Tfd * DUCC0_RESTRICT buf_, uint32_t nthreads) const
       {
       using Tcd = Cmplx<Tfd>;
       auto buf = reinterpret_cast<Tcd *>(buf_);
@@ -2784,11 +2784,11 @@ template <typename Tfs> class rfftpblue: public rfftpass<Tfs>
       : l1(l1_), ido(ido_), ip(ip_), wa((ip-1)*(ido-1)),
         cplan(cfftpass<Tfs>::make_pass(1,1,ip,roots,vectorize))
       {
-      PAR_MR_assert(ip&1, "Bluestein length must be odd");
-      PAR_MR_assert(ido&1, "ido must be odd");
+      MR_assert(ip&1, "Bluestein length must be odd");
+      MR_assert(ido&1, "ido must be odd");
       size_t N=ip*l1*ido;
       auto rfct = roots->size()/N;
-      PAR_MR_assert(roots->size()==N*rfct, "mismatch");
+      MR_assert(roots->size()==N*rfct, "mismatch");
       for (size_t j=1; j<ip; ++j)
         for (size_t i=1; i<=(ido-1)/2; ++i)
           {
@@ -2843,7 +2843,7 @@ template <typename Tfs> class rfft_multipass: public rfftpass<Tfs>
         return p1;
         }
       else
-        PAR_MR_fail("not yet supported");
+        MR_fail("not yet supported");
       }
 
   public:
@@ -2854,7 +2854,7 @@ template <typename Tfs> class rfft_multipass: public rfftpass<Tfs>
       {
       size_t N=ip*l1*ido;
       auto rfct = roots->size()/N;
-      PAR_MR_assert(roots->size()==N*rfct, "mismatch");
+      MR_assert(roots->size()==N*rfct, "mismatch");
       for (size_t j=1; j<ip; ++j)
         for (size_t i=1; i<=(ido-1)/2; ++i)
           {
@@ -2905,8 +2905,8 @@ template <typename Tfs> class rfftp_complexify: public rfftpass<Tfs>
     size_t l1, ido;
     static constexpr size_t ip=2;
 
-    template<bool fwd, typename Tfd> Tfd *exec_ (Tfd * DUCC_PAR_RESTRICT cc,
-      Tfd * DUCC_PAR_RESTRICT ch, Tfd * buf, uint32_t nthreads) const
+    template<bool fwd, typename Tfd> Tfd *exec_ (Tfd * DUCC0_RESTRICT cc,
+      Tfd * DUCC0_RESTRICT ch, Tfd * buf, uint32_t nthreads) const
       {
       using Tcd = Cmplx<Tfd>;
       auto ccc = reinterpret_cast<Tcd *>(cc);
@@ -2957,8 +2957,8 @@ template <typename Tfs> class rfftp_complexify: public rfftpass<Tfs>
       : N(N_), roots(roots_), pass(cfftpass<Tfs>::make_pass(N/2, vectorize))
       {
       rfct = roots->size()/N;
-      PAR_MR_assert(roots->size()==N*rfct, "mismatch");
-      PAR_MR_assert((N&1)==0, "N must be even");
+      MR_assert(roots->size()==N*rfct, "mismatch");
+      MR_assert((N&1)==0, "N must be even");
       }
 
     virtual size_t bufsize() const { return 2*pass->bufsize(); }
@@ -2973,7 +2973,7 @@ template <typename Tfs> class rfftp_complexify: public rfftpass<Tfs>
 template<typename Tfs> Trpass<Tfs> rfftpass<Tfs>::make_pass(size_t l1,
   size_t ido, size_t ip, const Troots<Tfs> &roots, bool vectorize)
   {
-  PAR_MR_assert(ip>=1, "no zero-sized FFTs");
+  MR_assert(ip>=1, "no zero-sized FFTs");
   if (ip==1) return make_shared<rfftp1<Tfs>>();
   if ((ip>1000) && ((ip&1)==0))  // use complex transform
     {

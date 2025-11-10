@@ -52,22 +52,22 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *  Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
  */
 
-#ifndef DUCC_PAR_FFT_H
-#define DUCC_PAR_FFT_H
+#ifndef DUCC0_FFT_H
+#define DUCC0_FFT_H
 
 #include <cstddef>
 #include <typeindex>
 #include <memory>
 #include <vector>
 #include <complex>
-#include "ducc-par/infra/error_handling.h"
-#include "ducc-par/infra/aligned_array.h"
-#include "ducc-par/infra/mav.h"
-#include "ducc-par/math/cmplx.h"
-#include "ducc-par/math/unity_roots.h"
+#include "ducc0/infra/error_handling.h"
+#include "ducc0/infra/aligned_array.h"
+#include "ducc0/infra/mav.h"
+#include "ducc0/math/cmplx.h"
+#include "ducc0/math/unity_roots.h"
 #include <par/pchunk.hpp>
 
-namespace ducc_par {
+namespace ducc0 {
 
 namespace detail_fft {
 
@@ -91,7 +91,7 @@ template<bool fwd, typename T, typename T2> void special_mul (const Cmplx<T> &v1
 struct util1d // hack to avoid duplicate symbols
   {
   /* returns the smallest composite of 2, 3, 5, 7 and 11 which is >= n */
-  DUCC_PAR_NOINLINE static size_t good_size_cmplx(size_t n)
+  DUCC0_NOINLINE static size_t good_size_cmplx(size_t n)
     {
     if (n<=12) return n;
 
@@ -120,15 +120,15 @@ struct util1d // hack to avoid duplicate symbols
     }
   /* returns the smallest composite of 2, 3, 5, 7 and 11 which is >= n
      and a multiple of required_factor. */
-  DUCC_PAR_NOINLINE static size_t good_size_cmplx(size_t n,
+  DUCC0_NOINLINE static size_t good_size_cmplx(size_t n,
     size_t required_factor)
     {
-    PAR_MR_assert(required_factor>=1, "required_factor must not be 0");
+    MR_assert(required_factor>=1, "required_factor must not be 0");
     return good_size_cmplx((n+required_factor-1)/required_factor) * required_factor;
     }
 
   /* returns the smallest composite of 2, 3, 5 which is >= n */
-  DUCC_PAR_NOINLINE static size_t good_size_real(size_t n)
+  DUCC0_NOINLINE static size_t good_size_real(size_t n)
     {
     if (n<=6) return n;
 
@@ -155,16 +155,16 @@ struct util1d // hack to avoid duplicate symbols
     }
   /* returns the smallest composite of 2, 3, 5 which is >= n
      and a multiple of required_factor. */
-  DUCC_PAR_NOINLINE static size_t good_size_real(size_t n,
+  DUCC0_NOINLINE static size_t good_size_real(size_t n,
     size_t required_factor)
     {
-    PAR_MR_assert(required_factor>=1, "required_factor must not be 0");
+    MR_assert(required_factor>=1, "required_factor must not be 0");
     return good_size_real((n+required_factor-1)/required_factor) * required_factor;
     }
 
-  DUCC_PAR_NOINLINE static vector<size_t> prime_factors(size_t N)
+  DUCC0_NOINLINE static vector<size_t> prime_factors(size_t N)
     {
-    PAR_MR_assert(N>0, "need a positive number");
+    MR_assert(N>0, "need a positive number");
     vector<size_t> factors;
     while ((N&1)==0)
       { N>>=1; factors.push_back(2); }
@@ -197,7 +197,7 @@ template <typename Tfs> class cfftpass
 
     static vector<size_t> factorize(size_t N)
       {
-      PAR_MR_assert(N>0, "need a positive number");
+      MR_assert(N>0, "need a positive number");
       vector<size_t> factors;
       factors.reserve(15);
       while ((N&7)==0)
@@ -246,7 +246,7 @@ template <typename Tfs> class rfftpass
 
     static vector<size_t> factorize(size_t N)
       {
-      PAR_MR_assert(N>0, "need a positive number");
+      MR_assert(N>0, "need a positive number");
       vector<size_t> factors;
       while ((N&3)==0)
         { factors.push_back(4); N>>=2; }
@@ -293,7 +293,7 @@ template<typename Tfs> class pocketfft_c
     size_t length() const { return N; }
     size_t bufsize() const { return N*plan->needs_copy()+2*critbuf+plan->bufsize(); }
     size_t footprint() const { return plan->footprint(); }
-    template<typename Tfd> DUCC_PAR_NOINLINE Cmplx<Tfd> *exec(Cmplx<Tfd> *in, Cmplx<Tfd> *buf,
+    template<typename Tfd> DUCC0_NOINLINE Cmplx<Tfd> *exec(Cmplx<Tfd> *in, Cmplx<Tfd> *buf,
       Tfs fct, bool fwd, uint32_t nthreads=1) const
       {
       static const auto tic = tidx<Cmplx<Tfd> *>();
@@ -303,7 +303,7 @@ template<typename Tfs> class pocketfft_c
         for (size_t i=0; i<N; ++i) res[i]*=fct;
       return res;
       }
-    template<typename Tfd> DUCC_PAR_NOINLINE void exec_copyback(Cmplx<Tfd> *in, Cmplx<Tfd> *buf,
+    template<typename Tfd> DUCC0_NOINLINE void exec_copyback(Cmplx<Tfd> *in, Cmplx<Tfd> *buf,
       Tfs fct, bool fwd, uint32_t nthreads=1) const
       {
       static const auto tic = tidx<Cmplx<Tfd> *>();
@@ -322,7 +322,7 @@ template<typename Tfs> class pocketfft_c
           copy_n(res, N, in);
         }
       }
-    template<typename Tfd> DUCC_PAR_NOINLINE void exec(Cmplx<Tfd> *in, Tfs fct, bool fwd, uint32_t nthreads=1) const
+    template<typename Tfd> DUCC0_NOINLINE void exec(Cmplx<Tfd> *in, Tfs fct, bool fwd, uint32_t nthreads=1) const
       {
       aligned_array<Cmplx<Tfd>> buf(N*plan->needs_copy()+plan->bufsize());
       exec_copyback(in, buf.data(), fct, fwd, nthreads);
@@ -341,7 +341,7 @@ template<typename Tfs> class pocketfft_r
     size_t length() const { return N; }
     size_t bufsize() const { return N*plan->needs_copy()+plan->bufsize(); }
     size_t footprint() const { return plan->footprint(); }
-    template<typename Tfd> DUCC_PAR_NOINLINE Tfd *exec(Tfd *in, Tfd *buf, Tfs fct,
+    template<typename Tfd> DUCC0_NOINLINE Tfd *exec(Tfd *in, Tfd *buf, Tfs fct,
       bool fwd, uint32_t nthreads=1) const
       {
       static const auto tifd = tidx<Tfd *>();
@@ -351,7 +351,7 @@ template<typename Tfs> class pocketfft_r
         for (size_t i=0; i<N; ++i) res[i]*=fct;
       return res;
       }
-    template<typename Tfd> DUCC_PAR_NOINLINE void exec_copyback(Tfd *in, Tfd *buf,
+    template<typename Tfd> DUCC0_NOINLINE void exec_copyback(Tfd *in, Tfd *buf,
       Tfs fct, bool fwd, uint32_t nthreads=1) const
       {
       static const auto tifd = tidx<Tfd *>();
@@ -370,7 +370,7 @@ template<typename Tfs> class pocketfft_r
           copy_n(res, N, in);
         }
       }
-    template<typename Tfd> DUCC_PAR_NOINLINE void exec(Tfd *in, Tfs fct, bool fwd,
+    template<typename Tfd> DUCC0_NOINLINE void exec(Tfd *in, Tfs fct, bool fwd,
       uint32_t nthreads=1) const
       {
       aligned_array<Tfd> buf(N*plan->needs_copy()+plan->bufsize());
@@ -390,7 +390,7 @@ template<typename Tfs> class pocketfft_hartley
     size_t length() const { return N; }
     size_t bufsize() const { return N+plan->bufsize(); }
     size_t footprint() const { return plan->footprint(); }
-    template<typename Tfd> DUCC_PAR_NOINLINE Tfd *exec(Tfd *in, Tfd *buf, Tfs fct,
+    template<typename Tfd> DUCC0_NOINLINE Tfd *exec(Tfd *in, Tfd *buf, Tfs fct,
       uint32_t nthreads=1) const
       {
       static const auto tifd = tidx<Tfd *>();
@@ -409,14 +409,14 @@ template<typename Tfs> class pocketfft_hartley
 
       return res2;
       }
-    template<typename Tfd> DUCC_PAR_NOINLINE void exec_copyback(Tfd *in, Tfd *buf,
+    template<typename Tfd> DUCC0_NOINLINE void exec_copyback(Tfd *in, Tfd *buf,
       Tfs fct, uint32_t nthreads=1) const
       {
       auto res = exec(in, buf, fct, nthreads);
       if (res!=in)
         copy_n(res, N, in);
       }
-    template<typename Tfd> DUCC_PAR_NOINLINE void exec(Tfd *in, Tfs fct,
+    template<typename Tfd> DUCC0_NOINLINE void exec(Tfd *in, Tfs fct,
       uint32_t nthreads=1) const
       {
       aligned_array<Tfd> buf(N+plan->bufsize());
@@ -436,7 +436,7 @@ template<typename Tfs> class pocketfft_fht
     size_t length() const { return N; }
     size_t bufsize() const { return N+plan->bufsize(); }
     size_t footprint() const { return plan->footprint(); }
-    template<typename Tfd> DUCC_PAR_NOINLINE Tfd *exec(Tfd *in, Tfd *buf, Tfs fct,
+    template<typename Tfd> DUCC0_NOINLINE Tfd *exec(Tfd *in, Tfd *buf, Tfs fct,
       uint32_t nthreads=1) const
       {
       static const auto tifd = tidx<Tfd *>();
@@ -455,14 +455,14 @@ template<typename Tfs> class pocketfft_fht
 
       return res2;
       }
-    template<typename Tfd> DUCC_PAR_NOINLINE void exec_copyback(Tfd *in, Tfd *buf,
+    template<typename Tfd> DUCC0_NOINLINE void exec_copyback(Tfd *in, Tfd *buf,
       Tfs fct, uint32_t nthreads=1) const
       {
       auto res = exec(in, buf, fct, nthreads);
       if (res!=in)
         copy_n(res, N, in);
       }
-    template<typename Tfd> DUCC_PAR_NOINLINE void exec(Tfd *in, Tfs fct,
+    template<typename Tfd> DUCC0_NOINLINE void exec(Tfd *in, Tfs fct,
       uint32_t nthreads=1) const
       {
       aligned_array<Tfd> buf(N+plan->bufsize());
@@ -483,7 +483,7 @@ template<typename Tfs> class pocketfft_fftw
     size_t length() const { return N; }
     size_t bufsize() const { return N+plan->bufsize(); }
     size_t footprint() const { return plan->footprint(); }
-    template<typename Tfd> DUCC_PAR_NOINLINE Tfd *exec(Tfd *in, Tfd *buf, Tfs fct,
+    template<typename Tfd> DUCC0_NOINLINE Tfd *exec(Tfd *in, Tfd *buf, Tfs fct,
       bool fwd, uint32_t nthreads=1) const
       {
       static const auto tifd = tidx<Tfd *>();
@@ -520,14 +520,14 @@ template<typename Tfs> class pocketfft_fftw
 
       return res2;
       }
-    template<typename Tfd> DUCC_PAR_NOINLINE void exec_copyback(Tfd *in, Tfd *buf,
+    template<typename Tfd> DUCC0_NOINLINE void exec_copyback(Tfd *in, Tfd *buf,
       Tfs fct, bool fwd, uint32_t nthreads=1) const
       {
       auto res = exec(in, buf, fct, fwd, nthreads);
       if (res!=in)
         copy_n(res, N, in);
       }
-    template<typename Tfd> DUCC_PAR_NOINLINE void exec(Tfd *in, Tfs fct, bool fwd,
+    template<typename Tfd> DUCC0_NOINLINE void exec(Tfd *in, Tfs fct, bool fwd,
       uint32_t nthreads=1) const
       {
       aligned_array<Tfd> buf(N+plan->bufsize());
@@ -545,10 +545,10 @@ template<typename T0> class T_dct1
     pocketfft_r<T0> fftplan;
 
   public:
-    DUCC_PAR_NOINLINE T_dct1(size_t length, bool /*vectorize*/=false)
+    DUCC0_NOINLINE T_dct1(size_t length, bool /*vectorize*/=false)
       : fftplan(2*(length-1)) {}
 
-    template<typename T> DUCC_PAR_NOINLINE T *exec(T c[], T buf[], T0 fct, bool ortho,
+    template<typename T> DUCC0_NOINLINE T *exec(T c[], T buf[], T0 fct, bool ortho,
       int /*type*/, bool /*cosine*/, uint32_t nthreads=1) const
       {
       constexpr T0 sqrt2=T0(1.414213562373095048801688724209698L);
@@ -567,12 +567,12 @@ template<typename T0> class T_dct1
         { c[0]*=sqrt2*T0(0.5); c[n-1]*=sqrt2*T0(0.5); }
       return c;
       }
-    template<typename T> DUCC_PAR_NOINLINE void exec_copyback(T c[], T buf[], T0 fct, bool ortho,
+    template<typename T> DUCC0_NOINLINE void exec_copyback(T c[], T buf[], T0 fct, bool ortho,
       int /*type*/, bool /*cosine*/, uint32_t nthreads=1) const
       {
       exec(c, buf, fct, ortho, 1, true, nthreads);
       }
-    template<typename T> DUCC_PAR_NOINLINE void exec(T c[], T0 fct, bool ortho,
+    template<typename T> DUCC0_NOINLINE void exec(T c[], T0 fct, bool ortho,
       int /*type*/, bool /*cosine*/, uint32_t nthreads=1) const
       {
       aligned_array<T> buf(bufsize());
@@ -590,10 +590,10 @@ template<typename T0> class T_dst1
     pocketfft_r<T0> fftplan;
 
   public:
-    DUCC_PAR_NOINLINE T_dst1(size_t length, bool /*vectorize*/=false)
+    DUCC0_NOINLINE T_dst1(size_t length, bool /*vectorize*/=false)
       : fftplan(2*(length+1)) {}
 
-    template<typename T> DUCC_PAR_NOINLINE T *exec(T c[], T buf[], T0 fct,
+    template<typename T> DUCC0_NOINLINE T *exec(T c[], T buf[], T0 fct,
       bool /*ortho*/, int /*type*/, bool /*cosine*/, uint32_t nthreads=1) const
       {
       size_t N=fftplan.length(), n=N/2-1;
@@ -606,12 +606,12 @@ template<typename T0> class T_dst1
         c[i] = -res[2*i+2];
       return c;
       }
-    template<typename T> DUCC_PAR_NOINLINE void exec_copyback(T c[], T buf[], T0 fct,
+    template<typename T> DUCC0_NOINLINE void exec_copyback(T c[], T buf[], T0 fct,
       bool /*ortho*/, int /*type*/, bool /*cosine*/, uint32_t nthreads=1) const
       {
       exec(c, buf, fct, true, 1, false, nthreads);
       }
-    template<typename T> DUCC_PAR_NOINLINE void exec(T c[], T0 fct,
+    template<typename T> DUCC0_NOINLINE void exec(T c[], T0 fct,
       bool /*ortho*/, int /*type*/, bool /*cosine*/, uint32_t nthreads) const
       {
       aligned_array<T> buf(bufsize());
@@ -630,7 +630,7 @@ template<typename T0> class T_dcst23
     vector<T0> twiddle;
 
   public:
-    DUCC_PAR_NOINLINE T_dcst23(size_t length, bool /*vectorize*/=false)
+    DUCC0_NOINLINE T_dcst23(size_t length, bool /*vectorize*/=false)
       : fftplan(length), twiddle(length)
       {
       UnityRoots<T0,Cmplx<T0>> tw(4*length);
@@ -638,7 +638,7 @@ template<typename T0> class T_dcst23
         twiddle[i] = tw[i+1].r;
       }
 
-    template<typename T> DUCC_PAR_NOINLINE T *exec(T c[], T buf[], T0 fct, bool ortho,
+    template<typename T> DUCC0_NOINLINE T *exec(T c[], T buf[], T0 fct, bool ortho,
       int type, bool cosine, uint32_t nthreads=1) const
       {
       constexpr T0 sqrt2=T0(1.414213562373095048801688724209698L);
@@ -701,12 +701,12 @@ template<typename T0> class T_dcst23
         }
       return c;
       }
-    template<typename T> DUCC_PAR_NOINLINE void exec_copyback(T c[], T buf[], T0 fct,
+    template<typename T> DUCC0_NOINLINE void exec_copyback(T c[], T buf[], T0 fct,
       bool ortho, int type, bool cosine, uint32_t nthreads=1) const
       {
       exec(c, buf, fct, ortho, type, cosine, nthreads);
       }
-    template<typename T> DUCC_PAR_NOINLINE void exec(T c[], T0 fct, bool ortho,
+    template<typename T> DUCC0_NOINLINE void exec(T c[], T0 fct, bool ortho,
       int type, bool cosine, uint32_t nthreads=1) const
       {
       aligned_array<T> buf(bufsize());
@@ -729,7 +729,7 @@ template<typename T0> class T_dcst4
     size_t bufsz;
 
   public:
-    DUCC_PAR_NOINLINE T_dcst4(size_t length, bool /*vectorize*/=false)
+    DUCC0_NOINLINE T_dcst4(size_t length, bool /*vectorize*/=false)
       : N(length),
         fft((N&1) ? nullptr : make_unique<pocketfft_c<T0>>(N/2)),
         rfft((N&1)? make_unique<pocketfft_r<T0>>(N) : nullptr),
@@ -744,7 +744,7 @@ template<typename T0> class T_dcst4
         }
       }
 
-    template<typename T> DUCC_PAR_NOINLINE T *exec(T c[], T buf[], T0 fct,
+    template<typename T> DUCC0_NOINLINE T *exec(T c[], T buf[], T0 fct,
       bool /*ortho*/, int /*type*/, bool cosine, uint32_t nthreads) const
       {
       size_t n2 = N/2;
@@ -820,12 +820,12 @@ template<typename T0> class T_dcst4
           c[k] = -c[k];
       return c;
       }
-    template<typename T> DUCC_PAR_NOINLINE void exec_copyback(T c[], T buf[], T0 fct,
+    template<typename T> DUCC0_NOINLINE void exec_copyback(T c[], T buf[], T0 fct,
       bool /*ortho*/, int /*type*/, bool cosine, uint32_t nthreads=1) const
       {
       exec(c, buf, fct, true, 4, cosine, nthreads);
       }
-    template<typename T> DUCC_PAR_NOINLINE void exec(T c[], T0 fct,
+    template<typename T> DUCC0_NOINLINE void exec(T c[], T0 fct,
       bool /*ortho*/, int /*type*/, bool cosine, uint32_t nthreads=1) const
       {
       aligned_array<T> buf(bufsize());
@@ -866,7 +866,7 @@ constexpr bool FORWARD  = true,
  *  If the underlying array has more than one dimension, the computation will
  *  be distributed over \a nthreads threads.
  */
-template<typename T> DUCC_PAR_NOINLINE void c2c(const cfmav<complex<T>> &in,
+template<typename T> DUCC0_NOINLINE void c2c(const cfmav<complex<T>> &in,
   const vfmav<complex<T>> &out, const shape_t &axes, bool forward,
   T fct, uint32_t nthreads=1);
 
@@ -891,7 +891,7 @@ template<typename T> DUCC_PAR_NOINLINE void c2c(const cfmav<complex<T>> &in,
  *  If the underlying array has more than one dimension, the computation will
  *  be distributed over \a nthreads threads.
  */
-template<typename T> DUCC_PAR_NOINLINE void dct(const cfmav<T> &in, const vfmav<T> &out,
+template<typename T> DUCC0_NOINLINE void dct(const cfmav<T> &in, const vfmav<T> &out,
   const shape_t &axes, int type, T fct, bool ortho, uint32_t nthreads=1);
 
 /// Fast Discrete Sine Transform
@@ -915,40 +915,40 @@ template<typename T> DUCC_PAR_NOINLINE void dct(const cfmav<T> &in, const vfmav<
  *  If the underlying array has more than one dimension, the computation will
  *  be distributed over \a nthreads threads.
  */
-template<typename T> DUCC_PAR_NOINLINE void dst(const cfmav<T> &in, const vfmav<T> &out,
+template<typename T> DUCC0_NOINLINE void dst(const cfmav<T> &in, const vfmav<T> &out,
   const shape_t &axes, int type, T fct, bool ortho, uint32_t nthreads=1);
 
-template<typename T> DUCC_PAR_NOINLINE void r2c(const cfmav<T> &in,
+template<typename T> DUCC0_NOINLINE void r2c(const cfmav<T> &in,
   const vfmav<complex<T>> &out, size_t axis, bool forward, T fct,
   uint32_t nthreads=1);
 
-template<typename T> DUCC_PAR_NOINLINE void r2c(const cfmav<T> &in,
+template<typename T> DUCC0_NOINLINE void r2c(const cfmav<T> &in,
   const vfmav<complex<T>> &out, const shape_t &axes,
   bool forward, T fct, uint32_t nthreads=1);
 
-template<typename T> DUCC_PAR_NOINLINE void c2r(const cfmav<complex<T>> &in,
+template<typename T> DUCC0_NOINLINE void c2r(const cfmav<complex<T>> &in,
   const vfmav<T> &out,  size_t axis, bool forward, T fct, uint32_t nthreads=1);
 
-template<typename T> DUCC_PAR_NOINLINE void c2r(const cfmav<complex<T>> &in,
+template<typename T> DUCC0_NOINLINE void c2r(const cfmav<complex<T>> &in,
   const vfmav<T> &out, const shape_t &axes, bool forward, T fct,
   uint32_t nthreads=1);
 
-template<typename T> DUCC_PAR_NOINLINE void c2r_mut(const vfmav<complex<T>> &in,
+template<typename T> DUCC0_NOINLINE void c2r_mut(const vfmav<complex<T>> &in,
   const vfmav<T> &out, const shape_t &axes, bool forward, T fct,
   uint32_t nthreads=1);
 
-template<typename T> DUCC_PAR_NOINLINE void r2r_fftpack(const cfmav<T> &in,
+template<typename T> DUCC0_NOINLINE void r2r_fftpack(const cfmav<T> &in,
   const vfmav<T> &out, const shape_t &axes, bool real2hermitian, bool forward,
   T fct, uint32_t nthreads=1);
 
-template<typename T> DUCC_PAR_NOINLINE void r2r_fftw(const cfmav<T> &in,
+template<typename T> DUCC0_NOINLINE void r2r_fftw(const cfmav<T> &in,
   const vfmav<T> &out, const shape_t &axes, bool forward,
   T fct, uint32_t nthreads=1);
 
-template<typename T> DUCC_PAR_NOINLINE void r2r_separable_hartley(const cfmav<T> &in,
+template<typename T> DUCC0_NOINLINE void r2r_separable_hartley(const cfmav<T> &in,
   const vfmav<T> &out, const shape_t &axes, T fct, uint32_t nthreads=1);
 
-template<typename T> DUCC_PAR_NOINLINE void r2r_separable_fht(const cfmav<T> &in,
+template<typename T> DUCC0_NOINLINE void r2r_separable_fht(const cfmav<T> &in,
   const vfmav<T> &out, const shape_t &axes, T fct, uint32_t nthreads=1);
 
 template<typename T> void r2r_genuine_hartley(const cfmav<T> &in,
@@ -979,10 +979,10 @@ template<typename T> void r2r_genuine_fht(const cfmav<T> &in,
  *  If \a in has more than one dimension, the computation will
  *  be distributed over \a nthreads threads.
  */
-template<typename T> DUCC_PAR_NOINLINE void convolve_axis(const cfmav<T> &in,
+template<typename T> DUCC0_NOINLINE void convolve_axis(const cfmav<T> &in,
   const vfmav<T> &out, size_t axis, const cmav<T,1> &kernel, uint32_t nthreads=1);
 
-template<typename T> DUCC_PAR_NOINLINE void convolve_axis(const cfmav<complex<T>> &in,
+template<typename T> DUCC0_NOINLINE void convolve_axis(const cfmav<complex<T>> &in,
   const vfmav<complex<T>> &out, size_t axis, const cmav<complex<T>,1> &kernel,
   uint32_t nthreads=1);
 

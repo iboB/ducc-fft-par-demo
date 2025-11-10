@@ -3,14 +3,14 @@ add_library(ducc::fft-par ALIAS ducc-fft-par)
 
 target_sources(ducc-fft-par
     PUBLIC FILE_SET HEADERS FILES
-        ducc-par/fft/fft.h
-        ducc-par/infra/mav.h
-        ducc-par/infra/string_utils.h
+        ducc0/fft/fft.h
+        ducc0/infra/mav.h
+        ducc0/infra/string_utils.h
     PRIVATE
-        ducc-par/fft/fft_inst1.cc # float
-        ducc-par/fft/fft_inst2.cc # double and long double
-        ducc-par/infra/mav.cc
-        ducc-par/infra/string_utils.cc
+        ducc0/fft/fft_inst1.cc # float
+        ducc0/fft/fft_inst2.cc # double and long double
+        ducc0/infra/mav.cc
+        ducc0/infra/string_utils.cc
 )
 
 set_target_properties(ducc-fft-par PROPERTIES
@@ -18,5 +18,4 @@ set_target_properties(ducc-fft-par PROPERTIES
 )
 
 target_link_libraries(ducc-fft-par PUBLIC par::par)
-
 optimize_target_for_numeric_compute(ducc-fft-par)

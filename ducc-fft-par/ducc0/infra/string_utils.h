@@ -45,14 +45,14 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *  Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
  */
 
-/** \file ducc-par/infra/string_utils.h
+/** \file ducc0/infra/string_utils.h
  *
  *  \copyright Copyright (C) 2019-2021 Max-Planck-Society
  *  \author Martin Reinecke
  */
 
-#ifndef DUCC_PAR_STRING_UTILS_H
-#define DUCC_PAR_STRING_UTILS_H
+#ifndef DUCC0_STRING_UTILS_H
+#define DUCC0_STRING_UTILS_H
 
 // FIXME: most of this will be superseded by C++20 std::format
 
@@ -61,7 +61,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <cstdint>
 #include <cstddef>
 
-namespace ducc_par {
+namespace ducc0 {
 
 namespace detail_string_utils {
 

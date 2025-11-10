@@ -66,10 +66,10 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <string>
 #include <cstring>
 #include <cctype>
-#include "ducc-par/infra/string_utils.h"
-#include "ducc-par/infra/error_handling.h"
+#include "ducc0/infra/string_utils.h"
+#include "ducc0/infra/error_handling.h"
 
-namespace ducc_par {
+namespace ducc0 {
 
 namespace detail_string_utils {
 
@@ -130,7 +130,7 @@ string intToString(int64_t x, size_t width)
   (x>=0) ? strstrm << setw(width) << setfill('0') << x
          : strstrm << "-" << setw(width-1) << setfill('0') << -x;
   string res = strstrm.str();
-  PAR_MR_assert(res.size()==width,"number too large");
+  MR_assert(res.size()==width,"number too large");
   return trim(res);
   }
 
@@ -144,9 +144,9 @@ template<typename T> T stringToData (const string &x)
     {
     string rest;
     strstrm >> rest;
-    ok = rest.empty();
+    ok = rest.length()==0;
     }
-  PAR_MR_assert(ok, "could not convert '", x, "' to desired data type.");
+  MR_assert(ok, "could not convert '", x, "' to desired data type.");
   return value;
   }
 
@@ -161,7 +161,7 @@ template<> bool stringToData (const string &x)
     if (equal_nocase(x,fval[i])) return false;
   for (size_t i=0; i< sizeof(tval)/sizeof(tval[0]); ++i)
     if (equal_nocase(x,tval[i])) return true;
-  PAR_MR_fail("conversion error in stringToData<bool>(",x,")");
+  MR_fail("conversion error in stringToData<bool>(",x,")");
   }
 
 template signed char stringToData (const string &x);
@@ -203,7 +203,7 @@ template<typename T> vector<T> split (istream &stream)
     {
     string word;
     stream >> word;
-    PAR_MR_assert (stream||stream.eof(),
+    MR_assert (stream||stream.eof(),
       "error while splitting stream into components");
     if (stream) list.push_back(stringToData<T>(word));
     }
@@ -238,13 +238,13 @@ vector<string> parse_words_from_file (const string &filename)
   {
   vector<string> words;
   ifstream inp(filename.c_str());
-  PAR_MR_assert (inp,"Could not open file '", filename, "'.");
+  MR_assert (inp,"Could not open file '", filename, "'.");
   while (inp)
     {
     string word;
     inp>>word;
     word=trim(word);
-    if (word.empty()) words.push_back(word);
+    if (word!="") words.push_back(word);
     }
   return words;
   }

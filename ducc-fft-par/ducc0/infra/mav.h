@@ -1,4 +1,4 @@
-/*! \file ducc-par/infra/mav.h
+/*! \file ducc0/infra/mav.h
  *  Classes for dealing with multidimensional arrays
  *
  *  \copyright Copyright (C) 2019-2025 Max-Planck-Society
@@ -50,8 +50,8 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *  Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
  */
 
-#ifndef DUCC_PAR_MAV_H
-#define DUCC_PAR_MAV_H
+#ifndef DUCC0_MAV_H
+#define DUCC0_MAV_H
 
 #include <array>
 #include <vector>
@@ -61,13 +61,13 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <functional>
 #include <tuple>
 #include <mutex>
-#include "ducc-par/infra/useful_macros.h"
-#include "ducc-par/infra/error_handling.h"
-#include "ducc-par/infra/aligned_array.h"
-#include "ducc-par/infra/misc_utils.h"
+#include "ducc0/infra/useful_macros.h"
+#include "ducc0/infra/error_handling.h"
+#include "ducc0/infra/aligned_array.h"
+#include "ducc0/infra/misc_utils.h"
 #include <par/pchunk.hpp>
 
-namespace ducc_par {
+namespace ducc0 {
 
 namespace detail_mav {
 
@@ -149,9 +149,9 @@ template<typename T> class cmembuf
 
     // prefetch the specified element for reading
     template<typename I> void prefetch_r(I i) const
-      { DUCC_PAR_PREFETCH_R(&d[i]); }
+      { DUCC0_PREFETCH_R(&d[i]); }
     template<typename I> void prefetch_w(I i) const
-      { DUCC_PAR_PREFETCH_W(&d[i]); }
+      { DUCC0_PREFETCH_W(&d[i]); }
   };
 
 constexpr size_t MAXIDX=~(size_t(0));
@@ -220,7 +220,7 @@ class fmav_info
       : shp(shape_), str(stride_),
         sz(accumulate(shp.begin(),shp.end(),size_t(1),multiplies<>()))
       {
-      PAR_MR_assert(shp.size()==str.size(), "dimensions mismatch");
+      MR_assert(shp.size()==str.size(), "dimensions mismatch");
       }
     /// Constructs an object with the given shape and computes the strides
     /// automatically, assuming a C-contiguous memory layout.
@@ -270,19 +270,19 @@ class fmav_info
     /// multi-dimensional index tuple, taking strides into account.
     template<typename... Ns> ptrdiff_t idx(Ns... ns) const
       {
-      PAR_MR_assert(ndim()==sizeof...(ns), "incorrect number of indices");
+      MR_assert(ndim()==sizeof...(ns), "incorrect number of indices");
       return getIdx(0, ns...);
       }
     ptrdiff_t idx(const shape_t &ns) const
       {
-      PAR_MR_assert(ndim()==ns.size(), "incorrect number of indices");
+      MR_assert(ndim()==ns.size(), "incorrect number of indices");
       size_t res = 0;
       for (size_t i=0; i<ndim(); ++i) res += str[i]*ns[i];
       return res;
       }
     template<typename RAiter> ptrdiff_t idxval(RAiter beg, RAiter end) const
       {
-      PAR_MR_assert(ndim()==size_t(end-beg), "incorrect number of indices");
+      MR_assert(ndim()==size_t(end-beg), "incorrect number of indices");
       size_t res = 0;
       for (size_t i=0; i<ndim(); ++i, ++beg) res += str[i]* (*beg);
       return res;
@@ -299,21 +299,21 @@ class fmav_info
         if (res[i2]==1)
           res[i2] = shp2[i];
         else
-          PAR_MR_assert((res[i2]==shp2[i])||(shp2[i]==1),
+          MR_assert((res[i2]==shp2[i])||(shp2[i]==1),
             "arrays cannot be broadcast together");
         }
       return res;
       }
     void bcast_to_shape(const shape_t &shp2)
       {
-      PAR_MR_assert(shp2.size()>=shp.size(), "cannot reduce dimensionality");
+      MR_assert(shp2.size()>=shp.size(), "cannot reduce dimensionality");
       stride_t newstr(shp2.size(), 0);
       for (size_t i=0; i<shp.size(); ++i)
         {
         size_t i2 = i+shp2.size()-shp.size();
         if (shp[i]!=1)
           {
-          PAR_MR_assert(shp[i]==shp2[i2], "arrays cannot be broadcast together");
+          MR_assert(shp[i]==shp2[i2], "arrays cannot be broadcast together");
           newstr[i2] = str[i];
           }
         }
@@ -323,7 +323,7 @@ class fmav_info
 
     void swap_axes(size_t ax0, size_t ax1)
       {
-      PAR_MR_assert(ax0<=ndim() && ax1<=ndim(), "bad axes");
+      MR_assert(ax0<=ndim() && ax1<=ndim(), "bad axes");
       if (ax0==ax1) return;
       swap(shp[ax0], shp[ax1]);
       swap(str[ax0], str[ax1]);
@@ -332,16 +332,16 @@ class fmav_info
     fmav_info extend_and_broadcast(const shape_t &new_shape,
       const shape_t &axpos) const
       {
-      PAR_MR_assert(new_shape.size()>=ndim(),
+      MR_assert(new_shape.size()>=ndim(),
         "new shape smaller than original one");
-      PAR_MR_assert(axpos.size()==ndim(), "bad axpos size");
+      MR_assert(axpos.size()==ndim(), "bad axpos size");
       stride_t new_stride(new_shape.size(), 0);
       vector<uint8_t> used(new_shape.size(),0);
       for (size_t i=0; i<ndim(); ++i)
         {
-        PAR_MR_assert(axpos[i]<new_shape.size(), "bad axis number");
-        PAR_MR_assert(shp[i]==new_shape[axpos[i]], "axis length nismatch");
-        PAR_MR_assert(used[axpos[i]]==0, "repeated axis position");
+        MR_assert(axpos[i]<new_shape.size(), "bad axis number");
+        MR_assert(shp[i]==new_shape[axpos[i]], "axis length nismatch");
+        MR_assert(used[axpos[i]]==0, "repeated axis position");
         used[axpos[i]]=1;
         new_stride[axpos[i]] = str[i];
         }
@@ -364,7 +364,7 @@ class fmav_info
       auto ndim = shp.size();
       shape_t nshp(ndim);
       stride_t nstr(ndim);
-      PAR_MR_assert(slices.size()==ndim, "incorrect number of slices");
+      MR_assert(slices.size()==ndim, "incorrect number of slices");
       size_t n0=0;
       for (auto x:slices) if (x.beg==x.end) ++n0;
       ptrdiff_t nofs=0;
@@ -374,12 +374,12 @@ class fmav_info
         {
 // FIXME: this doesn't work when working on dimensions of size 0.
 // Do we want to fix this?
-        PAR_MR_assert(slices[i].beg<shp[i], "bad subset");
+        MR_assert(slices[i].beg<shp[i], "bad subset");
         nofs+=slices[i].beg*str[i];
         if (slices[i].beg!=slices[i].end)
           {
           auto ext = slices[i].size(shp[i]);
-          PAR_MR_assert(slices[i].beg+(ext-1)*slices[i].step<shp[i], "bad subset");
+          MR_assert(slices[i].beg+(ext-1)*slices[i].step<shp[i], "bad subset");
           nshp[i2]=ext; nstr[i2]=slices[i].step*str[i];
           ++i2;
           }
@@ -435,7 +435,7 @@ template<size_t ndim> class mav_info
       : mav_info(shape_, shape2stride(shape_)) {}
     mav_info(const fmav_info &inp)
       {
-      PAR_MR_assert(inp.ndim()==ndim, "dimensionality mismatch");
+      MR_assert(inp.ndim()==ndim, "dimensionality mismatch");
       sz=1;
       for (size_t i=0; i<ndim; ++i)
         {
@@ -496,16 +496,16 @@ template<size_t ndim> class mav_info
       const vector<size_t> &axpos) const
       {
       static_assert(nd2>=ndim, "new shape smaller than original one");
-      PAR_MR_assert(axpos.size()==ndim, "bad axpos size");
+      MR_assert(axpos.size()==ndim, "bad axpos size");
       array<ptrdiff_t, nd2> new_stride;
       fill(new_stride.begin(), new_stride.end(), 0);
       array<uint8_t, nd2> used;
       fill(used.begin(), used.end(), 0);
       for (size_t i=0; i<ndim; ++i)
         {
-        PAR_MR_assert(axpos[i]<nd2, "bad axis number");
-        PAR_MR_assert(shp[i]==new_shape[axpos[i]], "axis length nismatch");
-        PAR_MR_assert(used[axpos[i]]==0, "repeated axis position");
+        MR_assert(axpos[i]<nd2, "bad axis number");
+        MR_assert(shp[i]==new_shape[axpos[i]], "axis length nismatch");
+        MR_assert(used[axpos[i]]==0, "repeated axis position");
         used[axpos[i]]=1;
         new_stride[axpos[i]] = str[i];
         }
@@ -521,7 +521,7 @@ template<size_t ndim> class mav_info
       }
     void swap_axes(size_t ax0, size_t ax1)
       {
-      PAR_MR_assert(ax0<=ndim && ax1<=ndim, "bad axes");
+      MR_assert(ax0<=ndim && ax1<=ndim, "bad axes");
       if (ax0==ax1) return;
       swap(shp[ax0], shp[ax1]);
       swap(str[ax0], str[ax1]);
@@ -554,7 +554,7 @@ template<size_t ndim> class mav_info
   protected:
     template<size_t nd2> auto subdata(const vector<slice> &slices) const
       {
-      PAR_MR_assert(slices.size()==ndim, "bad number of slices");
+      MR_assert(slices.size()==ndim, "bad number of slices");
       array<size_t, nd2> nshp;
       array<ptrdiff_t, nd2> nstr;
 
@@ -563,18 +563,18 @@ template<size_t ndim> class mav_info
 
       size_t n0=0;
       for (auto x:slices) if (x.beg==x.end) ++n0;
-      PAR_MR_assert(n0+nd2==ndim, "bad extent");
+      MR_assert(n0+nd2==ndim, "bad extent");
       ptrdiff_t nofs=0;
       for (size_t i=0, i2=0; i<ndim; ++i)
         {
 // FIXME: this doesn't work when working on dimensions of size 0.
 // Do we want to fix this?
-        PAR_MR_assert(slices[i].beg<shp[i], "bad subset");
+        MR_assert(slices[i].beg<shp[i], "bad subset");
         nofs+=slices[i].beg*str[i];
         if (slices[i].beg!=slices[i].end)
           {
           auto ext = slices[i].size(shp[i]);
-          PAR_MR_assert(slices[i].beg+(ext-1)*slices[i].step<shp[i], "bad subset");
+          MR_assert(slices[i].beg+(ext-1)*slices[i].step<shp[i], "bad subset");
           nshp[i2]=ext; nstr[i2]=slices[i].step*str[i];
           ++i2;
           }
@@ -595,7 +595,7 @@ template<typename T> class cfmav: public fmav_info, public cmembuf<T>
       ptrdiff_t ofs=0;
       for (size_t i=0; i<ndim(); ++i)
         ofs += (ptrdiff_t(shp[i])-1)*str[i];
-      PAR_MR_assert(ofs+1==ptrdiff_t(size()), "array is not compact");
+      MR_assert(ofs+1==ptrdiff_t(size()), "array is not compact");
       }
 
   public:
@@ -1047,9 +1047,9 @@ template<size_t nd2, typename T, size_t ndim> vmav<T,nd2> subarray
 
 // various operations involving fmav objects of the same shape -- experimental
 
-DUCC_PAR_NOINLINE tuple<fmav_info::shape_t, vector<fmav_info::stride_t>, size_t, size_t>
+DUCC0_NOINLINE tuple<fmav_info::shape_t, vector<fmav_info::stride_t>, size_t, size_t>
   multiprep(const vector<fmav_info> &info, const vector<size_t> &tsizes);
-DUCC_PAR_NOINLINE tuple<fmav_info::shape_t, vector<fmav_info::stride_t>>
+DUCC0_NOINLINE tuple<fmav_info::shape_t, vector<fmav_info::stride_t>>
   multiprep(const vector<fmav_info> &info);
 
 template<typename Ttuple> constexpr inline size_t tuplelike_size()
@@ -1162,7 +1162,7 @@ template<typename Ttuple> inline void advance_by_n (Ttuple &ptrs,
   }
 
 template<typename Ttuple, typename Func>
-  DUCC_PAR_NOINLINE void applyHelper_block(size_t idim, const vector<size_t> &shp,
+  DUCC0_NOINLINE void applyHelper_block(size_t idim, const vector<size_t> &shp,
     const vector<vector<ptrdiff_t>> &str, size_t bsi, size_t bsj,
     const Ttuple &ptrs, Func &&func)
   {
@@ -1185,7 +1185,7 @@ template<typename Ttuple, typename Func>
   }
 
 template<typename Ttuple, typename Func>
-  DUCC_PAR_NOINLINE void applyHelper(size_t idim, const vector<size_t> &shp,
+  DUCC0_NOINLINE void applyHelper(size_t idim, const vector<size_t> &shp,
     const vector<vector<ptrdiff_t>> &str, size_t block0, size_t block1,
     const Ttuple &ptrs, Func &&func, bool last_contiguous)
   {
@@ -1255,7 +1255,7 @@ template<typename ReduceType, typename Func, typename Ttuple> inline ReduceType 
                        make_index_sequence<tuplelike_size<Ttuple>()>());
   }
 template<typename ReduceType, typename Ttuple, typename Func>
-  DUCC_PAR_NOINLINE ReduceType applyReduceHelper_block(size_t idim,
+  DUCC0_NOINLINE ReduceType applyReduceHelper_block(size_t idim,
     const vector<size_t> &shp, const vector<vector<ptrdiff_t>> &str,
     size_t bsi, size_t bsj, const Ttuple &ptrs, Func &&func)
   {
@@ -1279,7 +1279,7 @@ template<typename ReduceType, typename Ttuple, typename Func>
   return rt;
   }
 template<typename ReduceType, typename Ttuple, typename Func>
-  DUCC_PAR_NOINLINE ReduceType applyReduceHelper(size_t idim, const vector<size_t> &shp,
+  DUCC0_NOINLINE ReduceType applyReduceHelper(size_t idim, const vector<size_t> &shp,
     const vector<vector<ptrdiff_t>> &str, size_t block0, size_t block1,
     const Ttuple &ptrs, Func &&func, bool last_contiguous)
   {
@@ -1354,7 +1354,7 @@ template<typename ReduceType, typename Func, typename... Targs>
     std::forward<Func>(func), nthreads, last_contiguous);
   }
 
-DUCC_PAR_NOINLINE tuple<fmav_info::shape_t, vector<fmav_info::stride_t>>
+DUCC0_NOINLINE tuple<fmav_info::shape_t, vector<fmav_info::stride_t>>
   multiprep_noopt(const vector<fmav_info> &info);
 
 template <typename Func, typename Arg, typename Ttuple, size_t... I>
@@ -1368,7 +1368,7 @@ template<typename Func, typename Arg, typename Ttuple> inline void call_with_tup
                        make_index_sequence<tuplelike_size<Ttuple>()>());
   }
 template<typename Ttuple, typename Func>
-  DUCC_PAR_NOINLINE void applyHelper_with_index(size_t idim, const vector<size_t> &shp,
+  DUCC0_NOINLINE void applyHelper_with_index(size_t idim, const vector<size_t> &shp,
     const vector<vector<ptrdiff_t>> &str, const Ttuple &ptrs, Func &&func,
     vector<size_t> &index)
   {
@@ -1485,7 +1485,7 @@ template<typename Tptrs, typename Tinfos>
 template<size_t ndim> auto make_infos(const fmav_info &info)
   {
   if constexpr(ndim>0)
-    PAR_MR_assert(ndim<=info.ndim(), "bad dimensionality");
+    MR_assert(ndim<=info.ndim(), "bad dimensionality");
   auto iterdim = info.ndim()-ndim;
   fmav_info fout({info.shape().begin(),info.shape().begin()+iterdim},
                  {info.stride().begin(),info.stride().begin()+iterdim});
@@ -1503,7 +1503,7 @@ template<size_t ndim> auto make_infos(const fmav_info &info)
   }
 
 template<typename Tptrs, typename Tinfos, typename Func>
-  DUCC_PAR_NOINLINE void flexible_mav_applyHelper(size_t idim, const vector<size_t> &shp,
+  DUCC0_NOINLINE void flexible_mav_applyHelper(size_t idim, const vector<size_t> &shp,
     const vector<vector<ptrdiff_t>> &str, const Tptrs &ptrs,
     const Tinfos &infos, Func &&func)
   {
@@ -1517,7 +1517,7 @@ template<typename Tptrs, typename Tinfos, typename Func>
       call_with_tuple2(func, make_mavrefs(locptrs, infos));
   }
 template<typename Tptrs, typename Tinfos, typename Func>
-  DUCC_PAR_NOINLINE void flexible_mav_applyHelper(const vector<size_t> &shp,
+  DUCC0_NOINLINE void flexible_mav_applyHelper(const vector<size_t> &shp,
     const vector<vector<ptrdiff_t>> &str, const Tptrs &ptrs,
     const Tinfos &infos, Func &&func, uint32_t nthreads)
   {

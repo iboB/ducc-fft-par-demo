@@ -1,4 +1,4 @@
-/*! \file ducc-par/infra/mav.cc
+/*! \file ducc0/infra/mav.cc
  *  Classes for dealing with multidimensional arrays
  *
  *  \copyright Copyright (C) 2019-2023 Max-Planck-Society
@@ -53,15 +53,15 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <cmath>
 #include <tuple>
 #include <algorithm>
-#include "ducc-par/infra/mav.h"
+#include "ducc0/infra/mav.h"
 
-namespace ducc_par {
+namespace ducc0 {
 
 namespace detail_mav {
 
 using namespace std;
 
-DUCC_PAR_NOINLINE void opt_shp_str(fmav_info::shape_t &shp, vector<fmav_info::stride_t> &str)
+DUCC0_NOINLINE void opt_shp_str(fmav_info::shape_t &shp, vector<fmav_info::stride_t> &str)
   {
   if (shp.size()>1)
     {
@@ -102,13 +102,13 @@ DUCC_PAR_NOINLINE void opt_shp_str(fmav_info::shape_t &shp, vector<fmav_info::st
     }
   }
 
-DUCC_PAR_NOINLINE tuple<fmav_info::shape_t, vector<fmav_info::stride_t>>
+DUCC0_NOINLINE tuple<fmav_info::shape_t, vector<fmav_info::stride_t>>
   multiprep(const vector<fmav_info> &info)
   {
   auto narr = info.size();
-  PAR_MR_assert(narr>=1, "need at least one array");
+  MR_assert(narr>=1, "need at least one array");
   for (size_t i=1; i<narr; ++i)
-    PAR_MR_assert(info[i].shape()==info[0].shape(), "shape mismatch");
+    MR_assert(info[i].shape()==info[0].shape(), "shape mismatch");
   fmav_info::shape_t shp;
   vector<fmav_info::stride_t> str(narr);
   for (size_t i=0; i<info[0].ndim(); ++i)
@@ -122,14 +122,14 @@ DUCC_PAR_NOINLINE tuple<fmav_info::shape_t, vector<fmav_info::stride_t>>
   return make_tuple(shp, str);
   }
 
-DUCC_PAR_NOINLINE tuple<fmav_info::shape_t, vector<fmav_info::stride_t>, size_t, size_t>
+DUCC0_NOINLINE tuple<fmav_info::shape_t, vector<fmav_info::stride_t>, size_t, size_t>
   multiprep(const vector<fmav_info> &info, const vector<size_t> &tsizes)
   {
   auto narr = info.size();
-  PAR_MR_assert(narr>=1, "need at least one array");
-  PAR_MR_assert(tsizes.size()==narr, "tsizes has wrong length");
+  MR_assert(narr>=1, "need at least one array");
+  MR_assert(tsizes.size()==narr, "tsizes has wrong length");
   for (size_t i=1; i<narr; ++i)
-    PAR_MR_assert(info[i].shape()==info[0].shape(), "shape mismatch");
+    MR_assert(info[i].shape()==info[0].shape(), "shape mismatch");
   fmav_info::shape_t shp;
   vector<fmav_info::stride_t> str(narr);
   for (size_t i=0; i<info[0].ndim(); ++i)
@@ -170,13 +170,13 @@ DUCC_PAR_NOINLINE tuple<fmav_info::shape_t, vector<fmav_info::stride_t>, size_t,
   return make_tuple(shp, str, blk, blk);
   }
 
-DUCC_PAR_NOINLINE tuple<fmav_info::shape_t, vector<fmav_info::stride_t>>
+DUCC0_NOINLINE tuple<fmav_info::shape_t, vector<fmav_info::stride_t>>
   multiprep_noopt(const vector<fmav_info> &info)
   {
   auto narr = info.size();
-  PAR_MR_assert(narr>=1, "need at least one array");
+  MR_assert(narr>=1, "need at least one array");
   for (size_t i=1; i<narr; ++i)
-    PAR_MR_assert(info[i].shape()==info[0].shape(), "shape mismatch");
+    MR_assert(info[i].shape()==info[0].shape(), "shape mismatch");
   fmav_info::shape_t shp;
   vector<fmav_info::stride_t> str(narr);
   for (size_t i=0; i<info[0].ndim(); ++i)

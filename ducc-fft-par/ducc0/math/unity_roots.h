@@ -46,15 +46,15 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *  Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
  */
 
-#ifndef DUCC_PAR_UNITY_ROOTS_H
-#define DUCC_PAR_UNITY_ROOTS_H
+#ifndef DUCC0_UNITY_ROOTS_H
+#define DUCC0_UNITY_ROOTS_H
 
 #include <cmath>
 #include <cstddef>
 #include <type_traits>
 #include <vector>
 
-namespace ducc_par {
+namespace ducc0 {
 
 namespace detail_unity_roots {
 

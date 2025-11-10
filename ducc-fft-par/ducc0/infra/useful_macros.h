@@ -51,24 +51,24 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *  Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
  */
 
-#ifndef DUCC_PAR_USEFUL_MACROS_H
-#define DUCC_PAR_USEFUL_MACROS_H
+#ifndef DUCC0_USEFUL_MACROS_H
+#define DUCC0_USEFUL_MACROS_H
 
 #if defined(__GNUC__)
-#define DUCC_PAR_NOINLINE [[gnu::noinline]]
-#define DUCC_PAR_RESTRICT __restrict__
-#define DUCC_PAR_PREFETCH_R(addr) __builtin_prefetch(addr);
-#define DUCC_PAR_PREFETCH_W(addr) __builtin_prefetch(addr,1);
+#define DUCC0_NOINLINE [[gnu::noinline]]
+#define DUCC0_RESTRICT __restrict__
+#define DUCC0_PREFETCH_R(addr) __builtin_prefetch(addr);
+#define DUCC0_PREFETCH_W(addr) __builtin_prefetch(addr,1);
 #elif defined(_MSC_VER)
-#define DUCC_PAR_NOINLINE __declspec(noinline)
-#define DUCC_PAR_RESTRICT __restrict
-#define DUCC_PAR_PREFETCH_R(addr)
-#define DUCC_PAR_PREFETCH_W(addr)
+#define DUCC0_NOINLINE __declspec(noinline)
+#define DUCC0_RESTRICT __restrict
+#define DUCC0_PREFETCH_R(addr)
+#define DUCC0_PREFETCH_W(addr)
 #else
-#define DUCC_PAR_NOINLINE
-#define DUCC_PAR_RESTRICT
-#define DUCC_PAR_PREFETCH_R(addr)
-#define DUCC_PAR_PREFETCH_W(addr)
+#define DUCC0_NOINLINE
+#define DUCC0_RESTRICT
+#define DUCC0_PREFETCH_R(addr)
+#define DUCC0_PREFETCH_W(addr)
 #endif
 
 #endif
